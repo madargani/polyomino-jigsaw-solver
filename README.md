@@ -1,6 +1,6 @@
 # Woodster Jigsaw Puzzle
 
-This Christmas I was gifted this [extremely difficult jigsaw puzzle](https://www.amazon.com/Bending-Wooden-Labyrinth-Difficult-Puzzles/dp/B08DDFNGV6).
+This Christmas I was gifted the [Aztec Labrinth puzzle](https://www.amazon.com/Bending-Wooden-Labyrinth-Difficult-Puzzles/dp/B08DDFNGV6) by Woodster.
 
 Inspired by day 12 of [Advent of Code 2025](https://adventofcode.com/2025), I decided to make a solver for this puzzle.
 

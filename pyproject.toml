@@ -1,7 +1,16 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "woodster-jigsaw-solver"
 version = "0.1.0"
-description = "Add your description here"
+description = "A solver for the Aztec Labrynth puzzle by Woodster. It processes an image of the pieces then finds a solution using a backtracking algorithm."
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "opencv-python>=4.12.0.88",
+]
+
+[project.scripts]
+solve = "woodster_jigsaw_solver.__main__:main"
