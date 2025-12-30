@@ -12,5 +12,13 @@ dependencies = [
     "opencv-python>=4.12.0.88",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0"]
+
 [project.scripts]
 solve = "woodster_jigsaw_solver.__main__:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
