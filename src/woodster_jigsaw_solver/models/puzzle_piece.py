@@ -43,3 +43,18 @@ class PuzzlePiece:
 
         normalized = sorted((x - min_x, y - min_y) for x, y in coords)
         return tuple(normalized)
+
+    def ascii_diagram(self) -> str:
+        coords = next(iter(self.transformations))
+        if not coords:
+            return ""
+
+        max_x = max(x for x, _ in coords)
+        max_y = max(y for _, y in coords)
+
+        grid = [[" " for _ in range(max_x + 1)] for _ in range(max_y + 1)]
+
+        for x, y in coords:
+            grid[y][x] = "█"
+
+        return "\n".join("".join(row) for row in grid)
