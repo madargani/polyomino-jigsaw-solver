@@ -10,18 +10,18 @@ Inspired by day 12 of [Advent of Code 2025](https://adventofcode.com/2025), I de
 
 ### Running the Application
 
-You can run the Woodster Jigsaw Solver using either method:
+You can run the Solver using either method:
 
 **Using Python module execution:**
 
 ```bash
-python -m woodster_jigsaw_solver
+python -m polyomino_jigsaw_solver
 ```
 
 **Direct script execution (from project root):**
 
 ```bash
-python src/woodster_jigsaw_solver/__main__.py
+python src/polyomino_jigsaw_solver/__main__.py
 ```
 
 ### Application Overview
