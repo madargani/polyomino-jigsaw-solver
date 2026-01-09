@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "woodster-jigsaw-solver"
+name = "polyomino-puzzle-solver"
 version = "0.1.0"
-description = "A solver for the Aztec Labrynth puzzle by Woodster. It processes an image of the pieces then finds a solution using a backtracking algorithm."
+description = "A solver for puzzles with polyomino shaped pieces"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

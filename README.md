@@ -1,4 +1,4 @@
-# Woodster Jigsaw Puzzle
+# Polyomino Jigsaw Puzzle
 
 This Christmas I was gifted the [Aztec Labrinth puzzle](https://www.amazon.com/Bending-Wooden-Labyrinth-Difficult-Puzzles/dp/B08DDFNGV6) by Woodster.
 
@@ -13,11 +13,13 @@ Inspired by day 12 of [Advent of Code 2025](https://adventofcode.com/2025), I de
 You can run the Woodster Jigsaw Solver using either method:
 
 **Using Python module execution:**
+
 ```bash
 python -m woodster_jigsaw_solver
 ```
 
 **Direct script execution (from project root):**
+
 ```bash
 python src/woodster_jigsaw_solver/__main__.py
 ```
