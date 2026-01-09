@@ -26,33 +26,7 @@ python src/woodster_jigsaw_solver/__main__.py
 
 The solver provides a GUI interface with two main tabs:
 
-1. **Board Tab**: Visualize and interact with the puzzle board grid
-2. **Pieces Tab**: Manage puzzle pieces, including adding new pieces from images
+1. **Pieces Tab**: Define and manage puzzle pieces
+2. **Board Tab**: Define the puzzle board grid
 
-### Basic Workflow
-
-1. Launch the application using one of the methods above
-2. Navigate to the **Pieces Tab** to add puzzle pieces from image files
-3. Switch to the **Board Tab** to see the puzzle board and arrange pieces
-4. Use the solver functionality to find solutions (WIP)
-
-### Development
-
-```bash
-# Install dependencies
-uv sync
-
-# Run tests
-pytest
-
-# Run with coverage
-pytest --cov=woodster_jigsaw_solver
-```
-
-## Technology Stack
-
-This project was built using Python 3 along with the following libraries:
-
-- [opencv](https://pypi.org/project/opencv-python/) - For image processing
-- [numpy](https://numpy.org/) - For efficient array storage and processing
-- [matplotlib](https://matplotlib.org/) - For animating the solving process
+After defining the pieces and the board press solve and watch the solver solve your puzzle.
