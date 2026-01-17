@@ -169,10 +169,7 @@ class PuzzleState:
         Returns:
             True if all pieces are placed and board is full
         """
-        return (
-            len(self._placed_pieces) == sum(self._remaining_pieces.values())
-            and self._board.is_full()
-        )
+        return len(self._remaining_pieces) == 0 and self._board.is_full()
 
     def can_proceed(self) -> bool:
         """Check if solving can proceed.

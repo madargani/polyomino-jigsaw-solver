@@ -78,9 +78,9 @@ description: "Task list for Polyomino Puzzle Solver feature implementation"
 
 - [ ] T022 [P] [US1] Create main application entry point in src/main.py
 - [ ] T023 [US1] Create EditorWindow class with tabbed interface (Pieces tab, Board tab) in src/gui/editor_window.py
-- [ ] T024 [P] [US1] Create BoardView grid editor component with auto-resize to fit screen in src/gui/board_view.py
-- [ ] T025 [P] [US1] Create PieceWidget for piece drawing with consistent interaction patterns (click, drag, right-click) in src/gui/piece_widget.py
-- [ ] T026 [US1] Implement grid-based piece drawing with mouse interaction (left-click to add, drag to paint, right-click to toggle) in src/gui/piece_widget.py
+- [ ] T024 [P] [US1] Create BoardTab grid editor component with auto-resize to fit screen in src/gui/board_tab.py
+- [ ] T025 [P] [US1] Create PieceTab for piece drawing with consistent interaction patterns (click, drag, right-click) in src/gui/piece_tab.py
+- [ ] T026 [US1] Implement grid-based piece drawing with mouse interaction (left-click to add, drag to paint, right-click to toggle) in src/gui/piece_tab.py
 - [ ] T027 [US1] Implement board dimension input controls with auto-resize in src/gui/editor_window.py
 - [ ] T028 [US1] Implement piece list display and selection in src/gui/editor_window.py
 - [ ] T029 [US1] Implement piece add/delete functionality in src/gui/editor_window.py
@@ -245,8 +245,8 @@ Task: "Integration test for puzzle configuration creation and validation in test
 # Launch all GUI components for User Story 1 together:
 Task: "Create main application entry point in src/main.py"
 Task: "Create EditorWindow class with tabbed interface (Pieces tab, Board tab) in src/gui/editor_window.py"
-Task: "Create BoardView grid editor component with auto-resize to fit screen in src/gui/board_view.py"
-Task: "Create PieceWidget for piece drawing with consistent interaction patterns (click, drag, right-click) in src/gui/piece_widget.py"
+Task: "Create BoardTab grid editor component with auto-resize to fit screen in src/gui/board_tab.py"
+Task: "Create PieceTab for piece drawing with consistent interaction patterns (click, drag, right-click) in src/gui/piece_tab.py"
 ```
 
 ---

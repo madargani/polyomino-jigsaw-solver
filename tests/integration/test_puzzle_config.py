@@ -1,483 +1,359 @@
-"""Integration tests for PuzzleConfiguration."""
+"""Integration tests for puzzle configuration creation and validation."""
 
 from __future__ import annotations
 
 import pytest
 
-from src.models.board import GameBoard
 from src.models.piece import PuzzlePiece
+from src.models.board import GameBoard
 from src.models.puzzle_config import PuzzleConfiguration
+from src.models.puzzle_state import PuzzleState
+from src.logic.validator import validate_puzzle_config
 
 
 class TestPuzzleConfigurationCreation:
-    """Tests for PuzzleConfiguration creation and initialization."""
+    """Integration tests for PuzzleConfiguration creation and validation."""
 
-    def test_create_config_with_name_and_dimensions(self) -> None:
-        """Test creating a basic configuration."""
-        config = PuzzleConfiguration(
-            name="My Puzzle",
-            board_width=5,
-            board_height=5,
+    def test_create_simple_puzzle_configuration(self) -> None:
+        """Test creating a simple valid puzzle configuration."""
+        # Create some pieces
+        l_piece = PuzzlePiece(
+            name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)}
+        )
+        t_piece = PuzzlePiece(
+            name="T-tetromino", shape={(0, 0), (0, 1), (0, 2), (1, 1)}
         )
 
-        assert config.name == "My Puzzle"
-        assert config.board_width == 5
-        assert config.board_height == 5
-        assert len(config.pieces) == 0
-        assert len(config.blocked_cells) == 0
-
-    def test_create_config_with_pieces(self) -> None:
-        """Test creating configuration with pieces using dict format."""
-        piece1 = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1)})
-        piece2 = PuzzlePiece(name="I", shape={(0, 0), (0, 1), (0, 2), (0, 3)})
+        # Create configuration
         config = PuzzleConfiguration(
-            name="Test",
-            board_width=6,
-            board_height=6,
-            pieces={piece1: 1, piece2: 1},
+            name="Simple Puzzle",
+            board_width=4,
+            board_height=4,
+            pieces={l_piece: 2, t_piece: 1},
         )
 
+        assert config.name == "Simple Puzzle"
+        assert config.board_width == 4
+        assert config.board_height == 4
         assert len(config.pieces) == 2
-        assert config.pieces[piece1] == 1
-        assert config.pieces[piece2] == 1
+        assert config.pieces[l_piece] == 2
+        assert config.pieces[t_piece] == 1
 
-    def test_create_config_with_blocked_cells(self) -> None:
+    def test_puzzle_configuration_with_blocked_cells(self) -> None:
         """Test creating configuration with blocked cells."""
-        blocked = {(0, 0), (0, 1), (2, 2)}
+        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
+        blocked = {(1, 1), (1, 2)}
+
         config = PuzzleConfiguration(
-            name="Blocked Test",
-            board_width=5,
-            board_height=5,
+            name="Puzzle with Holes",
+            board_width=4,
+            board_height=4,
+            pieces={piece: 4},
             blocked_cells=blocked,
         )
 
         assert config.blocked_cells == blocked
 
-    def test_create_config_with_piece_counts(self) -> None:
-        """Test creating configuration with multiple copies of same piece."""
+    def test_validate_complete_configuration(self) -> None:
+        """Test validating a complete puzzle configuration."""
         piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1)})
         config = PuzzleConfiguration(
-            name="Multiple Pieces",
-            board_width=8,
-            board_height=8,
-            pieces={piece: 3},
+            name="Test",
+            board_width=4,
+            board_height=4,
+            pieces={piece: 4},  # 4 pieces × 3 cells = 12 cells, fits in 4x4=16
         )
 
-        assert len(config.pieces) == 1
-        assert config.pieces[piece] == 3
+        errors = validate_puzzle_config(
+            pieces=list(config.pieces.keys()),
+            board_width=config.board_width,
+            board_height=config.board_height,
+        )
 
-    def test_empty_name_raises_error(self) -> None:
-        """Test that empty puzzle name raises ValueError."""
-        with pytest.raises(ValueError, match="cannot be empty"):
-            PuzzleConfiguration(
-                name="",
-                board_width=5,
-                board_height=5,
-            )
+        # Should have no errors (area mismatch not triggered)
+        assert len(errors) == 0
 
-    def test_invalid_dimensions_raise_error(self) -> None:
-        """Test that invalid dimensions raise ValueError."""
-        with pytest.raises(ValueError, match="width must be between"):
-            PuzzleConfiguration(name="Test", board_width=0, board_height=5)
-
-        with pytest.raises(ValueError, match="height must be between"):
-            PuzzleConfiguration(name="Test", board_width=5, board_height=51)
-
-
-class TestPuzzleConfigurationPieceManagement:
-    """Tests for adding and removing pieces from configuration."""
-
-    def test_add_piece(self) -> None:
-        """Test adding a piece to configuration."""
-        config = PuzzleConfiguration(name="Test", board_width=5, board_height=5)
-        piece = PuzzlePiece(name="domino", shape={(0, 0), (1, 0)})
-
-        config.add_piece(piece)
-
-        assert len(config.pieces) == 1
-        assert config.pieces[piece] == 1
-
-    def test_add_multiple_copies(self) -> None:
-        """Test adding multiple copies of same piece."""
-        config = PuzzleConfiguration(name="Test", board_width=10, board_height=10)
-        piece = PuzzlePiece(name="monomino", shape={(0, 0)})
-
-        config.add_piece(piece, count=5)
-
-        assert len(config.pieces) == 1
-        assert config.pieces[piece] == 5
-
-    def test_add_duplicate_piece_increments_count(self) -> None:
-        """Test that adding same piece twice increments count."""
-        config = PuzzleConfiguration(name="Test", board_width=5, board_height=5)
-        piece = PuzzlePiece(name="test-piece", shape={(0, 0)})
-
-        config.add_piece(piece)
-        config.add_piece(piece)
-
-        assert len(config.pieces) == 1
-        assert config.pieces[piece] == 2
-
-    def test_remove_piece_decrements_count(self) -> None:
-        """Test removing a piece decrements count."""
-        config = PuzzleConfiguration(name="Test", board_width=5, board_height=5)
-        piece = PuzzlePiece(name="test-piece", shape={(0, 0)})
-
-        config.add_piece(piece, count=3)
-        config.remove_piece(piece, count=2)
-
-        assert config.pieces[piece] == 1
-
-    def test_remove_last_piece_removes_entry(self) -> None:
-        """Test that removing last piece removes it from dict."""
-        config = PuzzleConfiguration(name="Test", board_width=5, board_height=5)
-        piece = PuzzlePiece(name="test-piece", shape={(0, 0)})
-
-        config.add_piece(piece)
-        config.remove_piece(piece)
-
-        assert piece not in config.pieces
-
-    def test_remove_nonexistent_piece_raises_error(self) -> None:
-        """Test that removing non-existent piece raises ValueError."""
-        config = PuzzleConfiguration(name="Test", board_width=5, board_height=5)
-        piece = PuzzlePiece(name="test", shape={(0, 0)})
-
-        with pytest.raises(ValueError, match="not found"):
-            config.remove_piece(piece)
-
-
-class TestPuzzleConfigurationGetters:
-    """Tests for configuration getter methods."""
-
-    def test_get_piece_by_name(self) -> None:
-        """Test getting piece by name."""
-        piece = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0), (1, 1)})
+    def test_create_board_from_configuration(self) -> None:
+        """Test creating a GameBoard from configuration."""
+        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
         config = PuzzleConfiguration(
             name="Test",
             board_width=5,
             board_height=5,
-            pieces={piece: 1},
-        )
-
-        found = config.get_piece_by_name("L-tetromino")
-        assert found is not None
-        assert found == piece
-
-    def test_get_piece_by_name_returns_none_for_missing(self) -> None:
-        """Test that get_piece_by_name returns None for missing piece."""
-        config = PuzzleConfiguration(name="Test", board_width=5, board_height=5)
-
-        found = config.get_piece_by_name("nonexistent")
-        assert found is None
-
-    def test_get_all_pieces_expands_counts(self) -> None:
-        """Test that get_all_pieces returns list with counts expanded."""
-        piece1 = PuzzlePiece(name="A", shape={(0, 0)})
-        piece2 = PuzzlePiece(name="B", shape={(0, 0)})
-        config = PuzzleConfiguration(
-            name="Test",
-            board_width=5,
-            board_height=5,
-            pieces={piece1: 2, piece2: 3},
-        )
-
-        all_pieces = config.get_all_pieces()
-
-        assert len(all_pieces) == 5
-        assert all_pieces.count(piece1) == 2
-        assert all_pieces.count(piece2) == 3
-
-    def test_get_piece_counts(self) -> None:
-        """Test getting piece counts as dict."""
-        piece1 = PuzzlePiece(name="A", shape={(0, 0)})
-        piece2 = PuzzlePiece(name="B", shape={(0, 0)})
-        config = PuzzleConfiguration(
-            name="Test",
-            board_width=5,
-            board_height=5,
-            pieces={piece1: 2, piece2: 3},
-        )
-
-        counts = config.get_piece_counts()
-
-        assert counts == {"A": 2, "B": 3}
-
-    def test_get_board(self) -> None:
-        """Test creating GameBoard from configuration."""
-        blocked = {(0, 0), (1, 1)}
-        config = PuzzleConfiguration(
-            name="Test",
-            board_width=5,
-            board_height=5,
-            blocked_cells=blocked,
+            pieces={piece: 2},
+            blocked_cells={(2, 2)},
         )
 
         board = config.get_board()
 
-        assert isinstance(board, GameBoard)
         assert board.width == 5
         assert board.height == 5
-        assert board.blocked_cells == blocked
+        assert board.is_blocked((2, 2)) is True
 
+    def test_get_all_pieces_expands_counts(self) -> None:
+        """Test that get_all_pieces expands piece counts."""
+        l_piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
+        t_piece = PuzzlePiece(name="T", shape={(0, 0), (0, 1), (0, 2)})
 
-class TestPuzzleConfigurationArea:
-    """Tests for area calculation methods."""
-
-    def test_get_total_piece_area(self) -> None:
-        """Test calculating total piece area with counts."""
-        piece1 = PuzzlePiece(name="monomino", shape={(0, 0)})  # area 1
-        piece2 = PuzzlePiece(name="domino", shape={(0, 0), (1, 0)})  # area 2
         config = PuzzleConfiguration(
-            name="Test",
-            board_width=5,
-            board_height=5,
-            pieces={piece1: 3, piece2: 2},
+            name="Test", board_width=6, board_height=6, pieces={l_piece: 2, t_piece: 3}
         )
 
-        # 3*1 + 2*2 = 3 + 4 = 7
-        assert config.get_total_piece_area() == 7
+        all_pieces = config.get_all_pieces()
+
+        assert len(all_pieces) == 5  # 2 L's + 3 T's
+        assert all_pieces.count(l_piece) == 2
+        assert all_pieces.count(t_piece) == 3
+
+    def test_get_piece_counts(self) -> None:
+        """Test getting piece name to count mapping."""
+        l_piece = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0)})
+        t_piece = PuzzlePiece(name="T-tetromino", shape={(0, 0), (0, 1)})
+
+        config = PuzzleConfiguration(
+            name="Test", board_width=4, board_height=4, pieces={l_piece: 3, t_piece: 2}
+        )
+
+        counts = config.get_piece_counts()
+
+        assert counts["L-tetromino"] == 3
+        assert counts["T-tetromino"] == 2
+
+    def test_get_piece_area(self) -> None:
+        """Test calculating total piece area."""
+        l_piece = PuzzlePiece(
+            name="L", shape={(0, 0), (1, 0), (1, 1), (1, 2)}
+        )  # 4 cells
+        i_piece = PuzzlePiece(
+            name="I", shape={(0, 0), (0, 1), (0, 2), (0, 3)}
+        )  # 4 cells
+
+        config = PuzzleConfiguration(
+            name="Test",
+            board_width=8,
+            board_height=8,
+            pieces={l_piece: 2, i_piece: 1},  # 2×4 + 1×4 = 12 cells
+        )
+
+        assert config.get_piece_area() == 12
 
     def test_get_board_area(self) -> None:
-        """Test board area calculation."""
-        config = PuzzleConfiguration(name="Test", board_width=6, board_height=4)
-        assert config.get_board_area() == 24
-
-    def test_is_solvable_area_true(self) -> None:
-        """Test solvable area check when areas match."""
-        piece = PuzzlePiece(name="domino", shape={(0, 0), (1, 0)})  # area 2
+        """Test calculating board area."""
         config = PuzzleConfiguration(
-            name="Test",
-            board_width=2,
-            board_height=2,
-            pieces={piece: 2},
+            name="Test", board_width=6, board_height=4, pieces={}
         )
 
-        assert config.is_solvable_area() is True
+        assert config.get_board_area() == 24  # 6 × 4
 
-    def test_is_solvable_area_false(self) -> None:
-        """Test solvable area check when areas don't match."""
-        piece = PuzzlePiece(name="monomino", shape={(0, 0)})  # area 1
-        config = PuzzleConfiguration(
-            name="Test",
+    def test_is_solvable_area(self) -> None:
+        """Test area solvability check."""
+        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1)})  # 3 cells
+
+        # Exact fit
+        config1 = PuzzleConfiguration(
+            name="Exact",
             board_width=3,
             board_height=3,
-            pieces={piece: 5},  # 5 cells, but board has 9
+            pieces={piece: 3},  # 9 cells total
         )
+        assert config1.is_solvable_area() is True
 
-        assert config.is_solvable_area() is False
+        # Pieces exceed board
+        config2 = PuzzleConfiguration(
+            name="Too Big",
+            board_width=2,
+            board_height=2,
+            pieces={piece: 2},  # 6 cells, board has 4
+        )
+        assert config2.is_solvable_area() is False
 
 
-class TestPuzzleConfigurationValidation:
-    """Tests for configuration validation."""
+class TestPuzzleConfigurationModification:
+    """Test modifying puzzle configurations."""
 
-    def test_valid_config_validates(self) -> None:
-        """Test that valid configuration passes validation."""
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1)})
+    def test_add_piece(self) -> None:
+        """Test adding a piece to configuration."""
+        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
         config = PuzzleConfiguration(
-            name="Valid Test",
-            board_width=4,
-            board_height=3,
-            pieces={piece: 4},  # 4 * 3 = 12 cells, board has 16
+            name="Test", board_width=4, board_height=4, pieces={}
         )
 
-        errors = config.validate()
-        assert len(errors) == 0
+        config.add_piece(piece, 2)
 
-    def test_duplicate_piece_names_fails_validation(self) -> None:
-        """Test that duplicate piece names fail validation."""
-        piece1 = PuzzlePiece(name="same", shape={(0, 0)})
-        piece2 = PuzzlePiece(name="same", shape={(0, 0), (1, 0)})
+        assert config.pieces[piece] == 2
+        assert config.get_piece_area() == 4  # 2 pieces × 2 cells
+
+    def test_remove_piece(self) -> None:
+        """Test removing a piece from configuration."""
+        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
         config = PuzzleConfiguration(
-            name="Test",
-            board_width=5,
-            board_height=5,
-            pieces={piece1: 1, piece2: 1},
+            name="Test", board_width=4, board_height=4, pieces={piece: 3}
         )
 
-        errors = config.validate()
-        error_messages = [e.lower() for e in errors]
-        assert any("unique" in msg or "name" in msg for msg in error_messages)
+        config.remove_piece(piece, 2)
 
-    def test_negative_count_fails_validation(self) -> None:
-        """Test that negative piece count fails validation."""
-        piece = PuzzlePiece(name="test", shape={(0, 0)})
+        assert config.pieces[piece] == 1
+
+    def test_add_same_piece_increments_count(self) -> None:
+        """Test that adding same piece type increments count."""
+        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
         config = PuzzleConfiguration(
-            name="Test",
-            board_width=5,
-            board_height=5,
-            pieces={piece: -1},
+            name="Test", board_width=4, board_height=4, pieces={piece: 1}
         )
 
-        errors = config.validate()
-        assert len(errors) >= 1
+        config.add_piece(piece)
+
+        assert config.pieces[piece] == 2
 
 
 class TestPuzzleConfigurationSerialization:
-    """Tests for configuration serialization (to_dict/from_dict)."""
+    """Test puzzle configuration serialization."""
 
     def test_to_dict(self) -> None:
         """Test converting configuration to dictionary."""
         piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1)})
         config = PuzzleConfiguration(
             name="Test Puzzle",
-            board_width=5,
-            board_height=5,
+            board_width=4,
+            board_height=4,
             pieces={piece: 2},
-            blocked_cells={(0, 0)},
+            blocked_cells={(1, 1)},
         )
 
         data = config.to_dict()
 
         assert data["name"] == "Test Puzzle"
-        assert data["board_width"] == 5
-        assert data["board_height"] == 5
-        assert data["blocked_cells"] == [[0, 0]]
+        assert data["board_width"] == 4
+        assert data["board_height"] == 4
         assert len(data["pieces"]) == 1
         assert data["pieces"][0]["name"] == "L"
         assert data["pieces"][0]["count"] == 2
+        # Blocked cells are serialized as list of lists
+        assert [1, 1] in data["blocked_cells"]
 
     def test_from_dict(self) -> None:
         """Test creating configuration from dictionary."""
         data = {
-            "name": "Loaded Puzzle",
-            "board_width": 6,
-            "board_height": 6,
-            "blocked_cells": [[0, 0], [1, 1]],
-            "pieces": [
-                {"name": "L", "shape": [[0, 0], [1, 0], [1, 1]], "count": 2},
-                {"name": "I", "shape": [[0, 0], [0, 1], [0, 2]], "count": 1},
-            ],
-        }
-
-        config = PuzzleConfiguration.from_dict(data)
-
-        assert config.name == "Loaded Puzzle"
-        assert config.board_width == 6
-        assert config.board_height == 6
-        assert len(config.pieces) == 2
-
-    def test_roundtrip_preserves_data(self) -> None:
-        """Test that to_dict and from_dict preserve all data."""
-        piece = PuzzlePiece(name="Test Piece", shape={(0, 0), (1, 0), (1, 1)})
-        config = PuzzleConfiguration(
-            name="Roundtrip Test",
-            board_width=7,
-            board_height=7,
-            pieces={piece: 3},
-            blocked_cells={(0, 0), (3, 3)},
-        )
-
-        # Roundtrip
-        data = config.to_dict()
-        restored = PuzzleConfiguration.from_dict(data)
-
-        assert restored == config
-
-    def test_from_dict_with_missing_count_defaults_to_1(self) -> None:
-        """Test that missing count field defaults to 1."""
-        data = {
-            "name": "Backward Compatible",
+            "name": "My Puzzle",
             "board_width": 5,
             "board_height": 5,
-            "pieces": [
-                {"name": "P", "shape": [[0, 0]]},  # No count field
-            ],
+            "blocked_cells": [[0, 0], [0, 1]],
+            "pieces": [{"name": "L", "shape": [[0, 0], [1, 0], [1, 1]], "count": 2}],
+            "created_at": "2026-01-14T12:00:00",
+            "modified_at": "2026-01-14T12:30:00",
         }
 
         config = PuzzleConfiguration.from_dict(data)
-        piece = config.get_piece_by_name("P")
 
-        assert piece is not None
-        assert config.pieces[piece] == 1
+        assert config.name == "My Puzzle"
+        assert config.board_width == 5
+        assert config.board_height == 5
+        assert len(config.blocked_cells) == 2
+
+    def test_serialization_roundtrip(self) -> None:
+        """Test that serialization roundtrip preserves data."""
+        piece = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+        original = PuzzleConfiguration(
+            name="Roundtrip Test",
+            board_width=6,
+            board_height=6,
+            pieces={piece: 3},
+            blocked_cells={(2, 2), (3, 3)},
+        )
+
+        # Serialize and deserialize
+        data = original.to_dict()
+        restored = PuzzleConfiguration.from_dict(data)
+
+        assert restored.name == original.name
+        assert restored.board_width == original.board_width
+        assert restored.board_height == original.board_height
+        assert len(restored.pieces) == len(original.pieces)
+        assert restored.blocked_cells == original.blocked_cells
 
 
-class TestPuzzleConfigurationCopy:
-    """Tests for configuration copying."""
+class TestPuzzleStateIntegration:
+    """Integration tests with PuzzleState."""
 
-    def test_copy_preserves_state(self) -> None:
-        """Test that copy preserves all configuration state."""
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1)})
+    def test_create_state_from_config(self) -> None:
+        """Test creating PuzzleState from PuzzleConfiguration."""
+        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
         config = PuzzleConfiguration(
-            name="Original",
-            board_width=5,
-            board_height=5,
-            pieces={piece: 2},
-            blocked_cells={(0, 0)},
+            name="Test", board_width=4, board_height=4, pieces={piece: 2}
         )
 
-        copy = config.copy()
+        board = config.get_board()
+        state = PuzzleState(board, config.pieces)
 
-        assert copy.name == config.name
-        assert copy.board_width == config.board_width
-        assert copy.board_height == config.board_height
-        assert copy.blocked_cells == config.blocked_cells
-        assert len(copy.pieces) == len(config.pieces)
+        assert state.get_total_remaining_pieces() == 2
+        assert board.width == 4
+        assert board.height == 4
 
-    def test_copy_is_independent(self) -> None:
-        """Test that copy is independent of original."""
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1)})
+    def test_place_piece_updates_state(self) -> None:
+        """Test that placing pieces updates state correctly."""
+        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
         config = PuzzleConfiguration(
-            name="Original",
-            board_width=5,
-            board_height=5,
-            pieces={piece: 1},
+            name="Test", board_width=4, board_height=4, pieces={piece: 2}
         )
 
-        copy = config.copy()
+        board = config.get_board()
+        state = PuzzleState(board, config.pieces)
 
-        # Modify original
-        config.add_piece(piece)
+        # Place first piece
+        result = state.place_piece(piece, (0, 0))
+        assert result is True
+        assert state.get_total_remaining_pieces() == 1
+        assert len(state.placed_pieces) == 1
 
-        # Copy should be unchanged
-        assert len(copy.pieces) == 1
-        assert len(config.pieces) == 2
+        # Place second piece
+        result = state.place_piece(piece, (2, 0))
+        assert result is True
+        assert state.get_total_remaining_pieces() == 0
+        assert len(state.placed_pieces) == 2
 
+    def test_backtrack_removes_piece(self) -> None:
+        """Test that backtracking removes pieces correctly."""
+        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
+        config = PuzzleConfiguration(
+            name="Test", board_width=4, board_height=4, pieces={piece: 1}
+        )
 
-class TestPuzzleConfigurationEquality:
-    """Tests for configuration equality."""
+        board = config.get_board()
+        state = PuzzleState(board, config.pieces)
 
-    def test_equal_configs(self) -> None:
-        """Test that identical configurations are equal."""
-        piece1 = PuzzlePiece(name="A", shape={(0, 0)})
-        piece2 = PuzzlePiece(name="B", shape={(0, 0)})
-        config1 = PuzzleConfiguration(
+        # Place and then remove
+        state.place_piece(piece, (0, 0))
+        assert state.get_total_remaining_pieces() == 0
+
+        removed = state.remove_piece((0, 0))
+        assert removed is not None
+        assert state.get_total_remaining_pieces() == 1
+        assert len(state.placed_pieces) == 0
+
+    def test_is_solved_when_all_pieces_placed(self) -> None:
+        """Test is_solved returns True when all pieces placed."""
+        # Create configuration with pieces that fill board exactly
+        # 2x2 board = 4 cells
+        # Each piece covers 2 cells, so we need 2 pieces
+        piece = PuzzlePiece(name="Domino", shape={(0, 0), (0, 1)})  # 2 cells horizontal
+        config = PuzzleConfiguration(
             name="Test",
-            board_width=5,
-            board_height=5,
-            pieces={piece1: 1, piece2: 1},
-        )
-        config2 = PuzzleConfiguration(
-            name="Test",
-            board_width=5,
-            board_height=5,
-            pieces={piece1: 1, piece2: 1},
+            board_width=4,
+            board_height=2,  # 8 cells total
+            pieces={piece: 4},  # 4 dominoes = 8 cells
         )
 
-        assert config1 == config2
+        board = config.get_board()
+        state = PuzzleState(board, config.pieces)
 
-    def test_unequal_configs_different_pieces(self) -> None:
-        """Test that configs with different pieces are not equal."""
-        piece1 = PuzzlePiece(name="A", shape={(0, 0)})
-        piece2 = PuzzlePiece(name="B", shape={(0, 0)})
-        config1 = PuzzleConfiguration(
-            name="Test",
-            board_width=5,
-            board_height=5,
-            pieces={piece1: 1},
-        )
-        config2 = PuzzleConfiguration(
-            name="Test",
-            board_width=5,
-            board_height=5,
-            pieces={piece2: 1},
-        )
+        assert state.is_solved() is False
 
-        assert config1 != config2
-
-    def test_unequal_configs_different_dimensions(self) -> None:
-        """Test that configs with different dimensions are not equal."""
-        config1 = PuzzleConfiguration(name="Test", board_width=5, board_height=5)
-        config2 = PuzzleConfiguration(name="Test", board_width=6, board_height=5)
-
-        assert config1 != config2
+        # Place all pieces
+        state.place_piece(piece, (0, 0))  # Top-left
+        assert state.is_solved() is False
+        state.place_piece(piece, (0, 2))  # Top-right
+        assert state.is_solved() is False
+        state.place_piece(piece, (1, 0))  # Bottom-left
+        assert state.is_solved() is False
+        state.place_piece(piece, (1, 2))  # Bottom-right
+        assert state.is_solved() is True

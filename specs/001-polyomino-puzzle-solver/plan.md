@@ -135,7 +135,7 @@ tests/
 - Create source code structure (src/, tests/)
 - Implement models (piece, board, puzzle_state, puzzle_config)
 - Implement logic (solver, validator, rotation)
-- Implement GUI (editor_window, viz_window, board_view, piece_widget)
+- Implement GUI (editor_window, viz_window, board_tab, piece_tab)
 - Implement utils (file_io)
 - Write unit tests
 - Write integration tests
