@@ -185,27 +185,27 @@ def validate_puzzle_config(
         )
         return errors
 
-    # Check unique piece IDs
-    piece_ids = []
+    # Check unique piece names
+    piece_names = []
     for piece in pieces:
-        if not hasattr(piece, "id"):
+        if not hasattr(piece, "name"):
             errors.append(
                 ValidationError(
-                    "MISSING_PIECE_ID",
-                    "Piece is missing ID attribute",
+                    "MISSING_PIECE_NAME",
+                    "Piece is missing name attribute",
                 )
             )
             continue
 
-        if piece.id in piece_ids:
+        if piece.name in piece_names:
             errors.append(
                 ValidationError(
-                    "DUPLICATE_PIECE_ID",
-                    f"Duplicate piece ID: {piece.id}",
-                    {"piece_id": piece.id},
+                    "DUPLICATE_PIECE_NAME",
+                    f"Duplicate piece name: {piece.name}",
+                    {"piece_name": piece.name},
                 )
             )
-        piece_ids.append(piece.id)
+        piece_names.append(piece.name)
 
     # Validate each piece shape
     total_piece_area = 0
@@ -214,7 +214,7 @@ def validate_puzzle_config(
             errors.append(
                 ValidationError(
                     "MISSING_PIECE_SHAPE",
-                    f"Piece {getattr(piece, 'id', 'unknown')} "
+                    f"Piece {getattr(piece, 'name', 'unknown')} "
                     "is missing shape attribute",
                 )
             )

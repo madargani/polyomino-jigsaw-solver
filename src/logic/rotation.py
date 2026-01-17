@@ -154,7 +154,7 @@ def shape_from_string(shape_str: str) -> Set[Tuple[int, int]]:
     """Parse shape from string representation.
 
     Args:
-        shape_str: String like "{(0,0), (0,1), (1,1)}"
+        shape_str: String like "{(0,0), (0,1), (1,1)}" or "0,0 0,1 1,1"
 
     Returns:
         Set of (row, col) coordinates
@@ -162,25 +162,41 @@ def shape_from_string(shape_str: str) -> Set[Tuple[int, int]]:
     Raises:
         ValueError: If format is invalid
     """
-    # Remove braces and split by comma
-    cleaned = shape_str.strip().strip("{}")
-    if not cleaned:
+    import re
+
+    cleaned = shape_str.strip()
+    if cleaned.startswith("{") and cleaned.endswith("}"):
+        cleaned = cleaned[1:-1]
+
+    if not cleaned.strip():
         return set()
 
-    coords = cleaned.split(",")
-    shape: Set[Tuple[int, int]] = set()
+    # Use regex to find all coordinate pairs like (0,1)
+    coord_pattern = r"\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)"
+    matches = re.findall(coord_pattern, cleaned)
 
-    for coord in coords:
-        coord = coord.strip()
-        if "(" in coord and ")" in coord:
-            inner = coord.strip("()")
-            parts = inner.split(",")
-            if len(parts) == 2:
+    if not matches and "(" not in cleaned:
+        # Try space-separated format: "0,0 0,1 1,1"
+        parts = cleaned.split()
+        shape: Set[Tuple[int, int]] = set()
+        for part in parts:
+            coords = part.split(",")
+            if len(coords) == 2:
                 try:
-                    row = int(parts[0].strip())
-                    col = int(parts[1].strip())
+                    row = int(coords[0].strip())
+                    col = int(coords[1].strip())
                     shape.add((row, col))
                 except ValueError:
-                    raise ValueError(f"Invalid coordinate: {coord}")
+                    pass
+        return shape
+
+    shape: Set[Tuple[int, int]] = set()
+    for match in matches:
+        try:
+            row = int(match[0])
+            col = int(match[1])
+            shape.add((row, col))
+        except ValueError:
+            raise ValueError(f"Invalid coordinate: ({match[0]}, {match[1]})")
 
     return shape

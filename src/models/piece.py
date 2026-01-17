@@ -6,22 +6,22 @@ from src.logic.validator import is_contiguous
 
 
 class PuzzlePiece:
-    """Represents a single polyomino piece with its shape, color, and unique identifier.
+    """Represents a single polyomino piece with its shape and unique identifier.
+
+    Color is generated dynamically during visualization and not stored with the piece.
 
     Attributes:
-        id: Unique identifier for the piece
+        name: Unique identifier for the piece shape
         shape: Set of (row, col) coordinates defining the piece shape
-        color: Display color (hex or named)
         precomputed_orientations: Precomputed unique orientations (8 max)
     """
 
-    def __init__(self, id: str, shape: set[tuple[int, int]], color: str) -> None:
+    def __init__(self, name: str, shape: set[tuple[int, int]]) -> None:
         """Initialize a puzzle piece.
 
         Args:
-            id: Unique identifier for the piece
+            name: Unique identifier for the piece shape
             shape: Set of (row, col) coordinates defining the piece shape
-            color: Display color (hex or named)
 
         Raises:
             ValueError: If shape is empty or not contiguous
@@ -31,30 +31,41 @@ class PuzzlePiece:
         if not is_contiguous(shape):
             raise ValueError("Shape must be contiguous (all cells connected)")
 
-        self._id = id
+        self._name = name
         self._shape = shape
-        self._color = color
         # Precompute all 8 orientations (4 rotations × 2 mirrors) for performance
         self._precomputed_orientations = self._compute_all_orientations()
 
     @classmethod
+    def with_id(cls, shape: set[tuple[int, int]], id: str) -> "PuzzlePiece":
+        """Factory method to create a piece with an identifier for internal tracking.
+
+        Args:
+            shape: Set of (row, col) coordinates defining the piece shape
+            id: Unique identifier for the piece (used internally, not persisted)
+
+        Returns:
+            PuzzlePiece instance
+        """
+        piece = cls(id, shape)
+        return piece
+
+    @classmethod
     def _create_without_precompute(
-        cls, id: str, shape: set[tuple[int, int]], color: str
+        cls, name: str, shape: set[tuple[int, int]]
     ) -> "PuzzlePiece":
         """Create a PuzzlePiece without triggering precomputation (for internal use).
 
         Args:
-            id: Unique identifier for the piece
+            name: Unique identifier for the piece
             shape: Set of (row, col) coordinates defining the piece shape
-            color: Display color (hex or named)
 
         Returns:
             New PuzzlePiece instance without precomputed orientations
         """
         piece = object.__new__(cls)
-        piece._id = id
+        piece._name = name
         piece._shape = shape
-        piece._color = color
         # Skip precomputation to avoid infinite recursion
         piece._precomputed_orientations = []
         return piece
@@ -73,18 +84,16 @@ class PuzzlePiece:
             # Add original (not flipped) rotation (skip precomputation for these)
             orientations.append(
                 PuzzlePiece._create_without_precompute(
-                    f"{self._id}-rot{i * 90}",
+                    f"{self._name}-rot{i * 90}",
                     current_shape.copy(),
-                    self._color,
                 )
             )
             # Add flipped version (horizontal flip) - compute shape without creating piece yet
             flipped_shape = self._flip_shape(current_shape, "horizontal")
             orientations.append(
                 PuzzlePiece._create_without_precompute(
-                    f"{self._id}-rot{i * 90}fh",
+                    f"{self._name}-rot{i * 90}fh",
                     flipped_shape,
-                    self._color,
                 )
             )
             # Rotate 90° for next iteration
@@ -159,19 +168,14 @@ class PuzzlePiece:
         return self._precomputed_orientations
 
     @property
-    def id(self) -> str:
-        """Get the piece identifier."""
-        return self._id
+    def name(self) -> str:
+        """Get the piece name."""
+        return self._name
 
     @property
     def shape(self) -> set[tuple[int, int]]:
         """Get the piece shape coordinates."""
         return self._shape.copy()
-
-    @property
-    def color(self) -> str:
-        """Get the piece color."""
-        return self._color
 
     @property
     def area(self) -> int:
@@ -220,9 +224,8 @@ class PuzzlePiece:
         normalized_shape = {(row - min_row, col - min_col) for row, col in new_shape}
 
         return PuzzlePiece(
-            id=f"{self._id}-rot{degrees}",
+            name=f"{self._name}-rot{degrees}",
             shape=normalized_shape,
-            color=self._color,
         )
 
     def flip(self, axis: str = "horizontal") -> PuzzlePiece:
@@ -250,9 +253,8 @@ class PuzzlePiece:
         normalized_shape = {(row - min_row, col - min_col) for row, col in new_shape}
 
         return PuzzlePiece(
-            id=f"{self._id}-flip{axis[0]}",
+            name=f"{self._name}-flip{axis[0]}",
             shape=normalized_shape,
-            color=self._color,
         )
 
     def get_normalized_shape(self) -> set[tuple[int, int]]:
@@ -336,27 +338,20 @@ class PuzzlePiece:
     def _create_copy(self) -> PuzzlePiece:
         """Create a copy of this piece with the same attributes."""
         return PuzzlePiece(
-            id=self._id,
+            name=self._name,
             shape=self._shape.copy(),
-            color=self._color,
         )
 
     def __eq__(self, other: object) -> bool:
         """Check equality with another piece."""
         if not isinstance(other, PuzzlePiece):
             return NotImplemented
-        return (
-            self._id == other._id
-            and self._shape == other._shape
-            and self._color == other._color
-        )
+        return self._name == other._name and self._shape == other._shape
 
     def __hash__(self) -> int:
         """Make piece hashable for use in sets and dicts."""
-        return hash((self._id, frozenset(self._shape), self._color))
+        return hash((self._name, frozenset(self._shape)))
 
     def __repr__(self) -> str:
         """Get string representation."""
-        return (
-            f"PuzzlePiece(id='{self._id}', shape={self._shape}, color='{self._color}')"
-        )
+        return f"PuzzlePiece(name='{self._name}', shape={self._shape})"

@@ -14,28 +14,25 @@ class PuzzleState:
     Attributes:
         board: Current board configuration
         placed_pieces: List of (piece, position) tuples in placement order
-        available_pieces: Pieces not yet placed
+        remaining_pieces: Dictionary of piece to remaining count
         backtrack_history: History of solver operations
-        current_index: Index of piece being placed
     """
 
     def __init__(
         self,
         board: GameBoard,
-        pieces: list[PuzzlePiece],
+        pieces: dict[PuzzlePiece, int],
     ) -> None:
         """Initialize puzzle state with board and pieces.
 
         Args:
             board: The game board
-            pieces: List of puzzle pieces to place
+            pieces: Dictionary mapping piece to count (how many of that piece remain)
         """
         self._board = board
-        self._pieces = pieces
+        self._remaining_pieces = pieces.copy()  # Copy to avoid mutation
         self._placed_pieces: list[tuple[PuzzlePiece, tuple[int, int]]] = []
-        self._available_pieces = list(pieces)
         self._backtrack_history: list[dict[str, Any]] = []
-        self._current_index = 0
 
     @property
     def board(self) -> GameBoard:
@@ -48,19 +45,14 @@ class PuzzleState:
         return self._placed_pieces.copy()
 
     @property
-    def available_pieces(self) -> list[PuzzlePiece]:
-        """Get list of pieces not yet placed."""
-        return self._available_pieces.copy()
+    def remaining_pieces(self) -> dict[PuzzlePiece, int]:
+        """Get dictionary of remaining pieces with their counts."""
+        return self._remaining_pieces.copy()
 
     @property
     def backtrack_history(self) -> list[dict[str, Any]]:
         """Get history of solver operations."""
         return self._backtrack_history.copy()
-
-    @property
-    def current_index(self) -> int:
-        """Get current piece index."""
-        return self._current_index
 
     def place_piece(
         self,
@@ -77,66 +69,61 @@ class PuzzleState:
             True if piece was placed successfully
 
         Raises:
-            ValueError: If piece cannot be placed
+            ValueError: If piece cannot be placed or no more of that piece remain
         """
-        if piece not in self._available_pieces:
-            raise ValueError(f"Piece {piece.id} is not available")
+        # Check if we have any of this piece remaining
+        if self._remaining_pieces.get(piece, 0) <= 0:
+            raise ValueError(f"No more pieces of type '{piece.name}' remaining")
 
-        if not self._board.can_place_piece(piece.shape, position):
-            raise ValueError(f"Cannot place piece {piece.id} at position {position}")
+        if not self._board.can_place_piece(piece, position):
+            raise ValueError(f"Cannot place piece {piece.name} at position {position}")
 
         # Place the piece on the board
-        self._board.place_piece(piece.id, piece.shape, position)
+        self._board.place_piece(piece, position)
 
         # Update state
         self._placed_pieces.append((piece, position))
-        self._available_pieces.remove(piece)
-        self._current_index += 1
+
+        # Decrement remaining count
+        self._remaining_pieces[piece] = self._remaining_pieces.get(piece, 0) - 1
+        if self._remaining_pieces[piece] == 0:
+            del self._remaining_pieces[piece]
 
         # Record operation
-        self.record_operation("place", piece.id, position, piece)
+        self.record_operation("place", piece.name, position, piece)
 
         return True
 
-    def remove_piece(self, position: tuple[int, int]) -> bool:
+    def remove_piece(self, position: tuple[int, int]) -> PuzzlePiece | None:
         """Remove a piece (backtrack).
 
         Args:
             position: (row, col) position to remove piece from
 
         Returns:
-            True if piece was removed successfully
-
-        Raises:
-            ValueError: If no piece found at position
+            The piece that was removed, or None if no piece at position
         """
         # Find the piece at this position
-        piece_to_remove: PuzzlePiece | None = None
-        piece_position: tuple[int, int] | None = None
-
-        for piece, pos in self._placed_pieces:
+        for i, (piece, pos) in enumerate(self._placed_pieces):
             if pos == position:
-                piece_to_remove = piece
-                piece_position = pos
-                break
+                # Remove from board
+                self._board.remove_piece(piece, position)
+                # Remove from placed pieces
+                self._placed_pieces.pop(i)
+                # Increment remaining count
+                self._remaining_pieces[piece] = self._remaining_pieces.get(piece, 0) + 1
+                # Record operation
+                self.record_operation("remove", piece.name, position)
+                return piece
+        return None
 
-        if piece_to_remove is None or piece_position is None:
-            raise ValueError(f"No piece found at position {position}")
+    def get_total_remaining_pieces(self) -> int:
+        """Get total count of all remaining pieces.
 
-        # Remove from board
-        self._board.remove_piece(
-            piece_to_remove.id, piece_to_remove.shape, piece_position
-        )
-
-        # Update state
-        self._placed_pieces.remove((piece_to_remove, piece_position))
-        self._available_pieces.append(piece_to_remove)
-        self._current_index -= 1
-
-        # Record operation
-        self.record_operation("remove", piece_to_remove.id, piece_position)
-
-        return True
+        Returns:
+            Sum of all piece counts in remaining_pieces
+        """
+        return sum(self._remaining_pieces.values())
 
     def record_operation(
         self,
@@ -182,7 +169,10 @@ class PuzzleState:
         Returns:
             True if all pieces are placed and board is full
         """
-        return len(self._placed_pieces) == len(self._pieces) and self._board.is_full()
+        return (
+            len(self._placed_pieces) == sum(self._remaining_pieces.values())
+            and self._board.is_full()
+        )
 
     def can_proceed(self) -> bool:
         """Check if solving can proceed.
@@ -190,7 +180,7 @@ class PuzzleState:
         Returns:
             True if there are pieces left to place
         """
-        return len(self._available_pieces) > 0
+        return len(self._remaining_pieces) > 0
 
     def copy(self) -> PuzzleState:
         """Create a deep copy of the puzzle state.
@@ -198,11 +188,9 @@ class PuzzleState:
         Returns:
             New PuzzleState with identical state
         """
-        new_state = PuzzleState(self._board.copy(), list(self._pieces))
+        new_state = PuzzleState(self._board.copy(), self._remaining_pieces.copy())
         new_state._placed_pieces = list(self._placed_pieces)
-        new_state._available_pieces = list(self._available_pieces)
         new_state._backtrack_history = list(self._backtrack_history)
-        new_state._current_index = self._current_index
         return new_state
 
     def get_statistics(self) -> dict[str, Any]:
@@ -225,12 +213,13 @@ class PuzzleState:
             "backtracks": backtracks,
             "total_operations": len(self._backtrack_history),
             "pieces_placed": len(self._placed_pieces),
-            "pieces_remaining": len(self._available_pieces),
+            "pieces_remaining": self.get_total_remaining_pieces(),
         }
 
     def __repr__(self) -> str:
         """Get string representation."""
         return (
             f"PuzzleState(board={self._board}, "
-            f"placed={len(self._placed_pieces)}/{len(self._pieces)})"
+            f"placed={len(self._placed_pieces)}, "
+            f"remaining={self.get_total_remaining_pieces()})"
         )

@@ -46,7 +46,7 @@ description: "Task list for Polyomino Puzzle Solver feature implementation"
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [x] T010 Implement PuzzlePiece class with shape, color, id attributes in src/models/piece.py
+- [x] T010 Implement PuzzlePiece class with shape attribute (color generated dynamically during visualization) in src/models/piece.py
 - [x] T011 Implement GameBoard class with width, height, cells attributes in src/models/board.py
 - [x] T012 Implement PuzzleState class with board, placed_pieces, backtrack_history in src/models/puzzle_state.py
 - [x] T013 Implement PuzzleConfiguration class with name, board_width, board_height, pieces in src/models/puzzle_config.py
@@ -68,7 +68,7 @@ description: "Task list for Polyomino Puzzle Solver feature implementation"
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T017 [P] [US1] Unit test for PuzzlePiece creation, rotation, validation in tests/unit/test_piece.py
+- [ ] T017 [P] [US1] Unit test for PuzzlePiece creation, rotation, shape validation (no color validation needed) in tests/unit/test_piece.py
 - [ ] T018 [P] [US1] Unit test for GameBoard operations, placement checks in tests/unit/test_board.py
 - [ ] T019 [P] [US1] Unit test for rotation and flip operations in tests/unit/test_rotation.py
 - [ ] T020 [P] [US1] Unit test for validator logic (contiguity, bounds, overlap) in tests/unit/test_validator.py
@@ -77,16 +77,16 @@ description: "Task list for Polyomino Puzzle Solver feature implementation"
 ### Implementation for User Story 1
 
 - [ ] T022 [P] [US1] Create main application entry point in src/main.py
-- [ ] T023 [P] [US1] Create EditorWindow class in src/gui/editor_window.py
-- [ ] T024 [P] [US1] Create BoardView grid editor component in src/gui/board_view.py
-- [ ] T025 [P] [US1] Create PieceWidget for piece drawing and interaction in src/gui/piece_widget.py
-- [ ] T026 [US1] Implement grid-based piece drawing with mouse interaction in src/gui/piece_widget.py
-- [ ] T027 [US1] Implement board dimension input controls in src/gui/editor_window.py
+- [ ] T023 [US1] Create EditorWindow class with tabbed interface (Pieces tab, Board tab) in src/gui/editor_window.py
+- [ ] T024 [P] [US1] Create BoardView grid editor component with auto-resize to fit screen in src/gui/board_view.py
+- [ ] T025 [P] [US1] Create PieceWidget for piece drawing with consistent interaction patterns (click, drag, right-click) in src/gui/piece_widget.py
+- [ ] T026 [US1] Implement grid-based piece drawing with mouse interaction (left-click to add, drag to paint, right-click to toggle) in src/gui/piece_widget.py
+- [ ] T027 [US1] Implement board dimension input controls with auto-resize in src/gui/editor_window.py
 - [ ] T028 [US1] Implement piece list display and selection in src/gui/editor_window.py
 - [ ] T029 [US1] Implement piece add/delete functionality in src/gui/editor_window.py
 - [ ] T030 [US1] Implement puzzle configuration state management in src/models/puzzle_config.py
-- [ ] T031 [US1] Integrate board view and piece widget in editor window in src/gui/editor_window.py
-- [ ] T032 [US1] Add unique color generation for each piece type in src/utils/formatting.py
+- [ ] T031 [US1] Integrate tabbed editor interface in src/gui/editor_window.py
+- [ ] T032 [US1] Implement dynamic color generation for each piece type during visualization in src/utils/color_generator.py
 - [ ] T033 [US1] Add validation feedback display in src/gui/editor_window.py
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently. User can launch app, draw pieces, set board dimensions, and see configuration in editor.
@@ -244,9 +244,9 @@ Task: "Integration test for puzzle configuration creation and validation in test
 
 # Launch all GUI components for User Story 1 together:
 Task: "Create main application entry point in src/main.py"
-Task: "Create EditorWindow class in src/gui/editor_window.py"
-Task: "Create BoardView grid editor component in src/gui/board_view.py"
-Task: "Create PieceWidget for piece drawing and interaction in src/gui/piece_widget.py"
+Task: "Create EditorWindow class with tabbed interface (Pieces tab, Board tab) in src/gui/editor_window.py"
+Task: "Create BoardView grid editor component with auto-resize to fit screen in src/gui/board_view.py"
+Task: "Create PieceWidget for piece drawing with consistent interaction patterns (click, drag, right-click) in src/gui/piece_widget.py"
 ```
 
 ---
@@ -259,13 +259,14 @@ Task: "Create PieceWidget for piece drawing and interaction in src/gui/piece_wid
 2. Complete Phase 2: Foundational (T010-T016) - **CRITICAL**
 3. Complete Phase 3: User Story 1 (T017-T033)
 4. **STOP and VALIDATE**:
-   - Launch application: `python -m src.main`
-   - Draw a piece shape on the grid
-   - Set board dimensions to 5x5
-   - Add another piece
-   - Verify pieces are displayed with unique colors
-   - Delete a piece and verify it's removed
-5. Demo: Show users can define puzzle configurations
+    - Launch application: `python -m src.main`
+    - Switch between "Pieces" and "Board" tabs to verify tabbed interface works
+    - Draw a piece shape on the grid using left-click, drag, right-click interactions
+    - Set board dimensions to 5x5 and verify grid auto-resizes to fit screen
+    - Add another piece
+    - Verify pieces are listed and can be selected
+    - Delete a piece and verify it's removed
+5. Demo: Show users can define puzzle configurations using tabbed editor
 6. **MVP DELIVERED**: Core value proposition achieved
 
 ### Incremental Delivery
@@ -291,6 +292,17 @@ With multiple developers (2-3 developers recommended):
 
 ---
 
+## Spec Updates (2026-01-16)
+
+The following changes were made to align with updated design requirements:
+
+- **Tabbed Interface**: Editor uses separate "Pieces" and "Board" tabs to maximize vertical screen space (T023, T031)
+- **Auto-resize Grids**: Both piece and board editors automatically resize to fit within visible screen area (T024, T027)
+- **Consistent Interaction**: Both editors use identical interaction patterns (left-click, drag, right-click) (T025, T026)
+- **Dynamic Colors**: Piece colors are generated during visualization, not stored with piece definitions (T010, T032)
+
+---
+
 ## Format Validation
 
 ✅ **All tasks follow strict checklist format**:
@@ -303,8 +315,8 @@ With multiple developers (2-3 developers recommended):
 **Task Count Summary**:
 - Total tasks: 83
 - Phase 1 (Setup): 9 tasks
-- Phase 2 (Foundational): 7 tasks
-- Phase 3 (US1): 17 tasks (5 tests + 12 implementation)
+- Phase 2 (Foundational): 7 tasks (updated: PuzzlePiece now without color/id)
+- Phase 3 (US1): 17 tasks (5 tests + 12 implementation - updated: tabbed interface, auto-resize, consistent interactions)
 - Phase 4 (US2): 17 tasks (4 tests + 13 implementation)
 - Phase 5 (US3): 18 tasks (6 tests + 12 implementation)
 - Phase 6 (Polish): 15 tasks

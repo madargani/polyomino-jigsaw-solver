@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from src.models.piece import PuzzlePiece
+
 
 class GameBoard:
     """Represents the rectangular grid area where pieces must be placed.
@@ -89,18 +91,17 @@ class GameBoard:
         """Get number of empty cells."""
         return sum(1 for cell in self._cells.values() if cell is None)
 
-    def can_place_piece(
-        self, piece_shape: set[tuple[int, int]], position: tuple[int, int]
-    ) -> bool:
+    def can_place_piece(self, piece: PuzzlePiece, position: tuple[int, int]) -> bool:
         """Check if a piece can be placed at the specified position.
 
         Args:
-            piece_shape: Set of (row, col) coordinates for the piece
+            piece: The puzzle piece to place
             position: (row, col) position to place piece origin
 
         Returns:
             True if piece fits without overlapping, going out of bounds, or hitting blocked cells
         """
+        piece_shape = piece.shape
         for row_offset, col_offset in piece_shape:
             row = position[0] + row_offset
             col = position[1] + col_offset
@@ -122,15 +123,13 @@ class GameBoard:
 
     def place_piece(
         self,
-        piece_id: str,
-        piece_shape: set[tuple[int, int]],
+        piece: PuzzlePiece,
         position: tuple[int, int],
     ) -> bool:
         """Place a piece at the specified position.
 
         Args:
-            piece_id: Unique identifier for the piece
-            piece_shape: Set of (row, col) coordinates for the piece
+            piece: The puzzle piece to place
             position: (row, col) position to place piece origin
 
         Returns:
@@ -139,7 +138,8 @@ class GameBoard:
         Raises:
             ValueError: If piece cannot be placed at position
         """
-        if not self.can_place_piece(piece_shape, position):
+        piece_shape = piece.shape
+        if not self.can_place_piece(piece, position):
             raise ValueError(
                 f"Cannot place piece at position {position} with shape {piece_shape}"
             )
@@ -147,21 +147,19 @@ class GameBoard:
         for row_offset, col_offset in piece_shape:
             row = position[0] + row_offset
             col = position[1] + col_offset
-            self._cells[(row, col)] = piece_id
+            self._cells[(row, col)] = piece.name
 
         return True
 
     def remove_piece(
         self,
-        piece_id: str,
-        piece_shape: set[tuple[int, int]],
+        piece: PuzzlePiece,
         position: tuple[int, int],
     ) -> bool:
         """Remove a piece from the board.
 
         Args:
-            piece_id: Unique identifier for the piece
-            piece_shape: Set of (row, col) coordinates for the piece
+            piece: The puzzle piece to remove
             position: (row, col) position where piece is placed
 
         Returns:
@@ -170,12 +168,13 @@ class GameBoard:
         Raises:
             ValueError: If piece is not found at position
         """
+        piece_shape = piece.shape
         # Verify piece exists at position
         for row_offset, col_offset in piece_shape:
             row = position[0] + row_offset
             col = position[1] + col_offset
-            if self._cells.get((row, col)) != piece_id:
-                raise ValueError(f"Piece {piece_id} not found at position {position}")
+            if self._cells.get((row, col)) != piece.name:
+                raise ValueError(f"Piece {piece.name} not found at position {position}")
 
         # Remove the piece
         for row_offset, col_offset in piece_shape:

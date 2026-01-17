@@ -8,6 +8,7 @@
 A Python GUI application for solving polyomino puzzles using backtracking algorithm with real-time visualization. The application provides a puzzle editor for defining piece shapes and board configurations, and a separate visualization window showing the step-by-step solving process.
 
 **Technical Approach**:
+
 - **GUI Framework**: PySide6 (Qt6 Python bindings) for high-performance real-time visualization
 - **Architecture**: Thread-based solver with Qt signals for thread-safe GUI updates
 - **Data Layer**: Immutable models (PuzzlePiece, GameBoard, PuzzleState, PuzzleConfiguration)
@@ -24,11 +25,18 @@ A Python GUI application for solving polyomino puzzles using backtracking algori
 **Project Type**: Single desktop application  
 **Performance Goals**: 30fps minimum during visualization for puzzles with up to 2500 cells (50×50)  
 **Constraints**: <200ms UI response time, offline-capable, no external services  
-**Scale/Scope**: Single-user desktop application, typically 1-50 pieces per puzzle  
+**Scale/Scope**: Single-user desktop application, typically 1-50 pieces per puzzle
+
+## UI Design Notes
+
+- **Tabbed Interface**: Editor uses separate "Pieces" and "Board" tabs to maximize vertical screen space
+- **Auto-resize Grids**: Both piece and board editors automatically resize to fit within visible screen area
+- **Consistent Interaction**: Both editors use identical interaction patterns (left-click, drag, right-click)
+- **Dynamic Colors**: Piece colors are generated during visualization, not stored with piece definitions
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 - **Modularity & Decomposition**: ✅ Files split by responsibility (models/, logic/, gui/, utils/). Functions under 50 lines, files under 300 lines.
 - **Readability First**: ✅ All functions have type hints and docstrings. Descriptive naming throughout.
@@ -72,10 +80,10 @@ src/
 │   └── rotation.py      # RotationOperations class
 ├── gui/
 │   ├── __init__.py
-│   ├── editor_window.py # EditorWindow class
+│   ├── editor_window.py # EditorWindow class with tabbed interface (Pieces/Board tabs)
 │   ├── viz_window.py    # VizWindow class
-│   ├── board_view.py    # BoardView widget
-│   └── piece_widget.py  # PieceWidget component
+│   ├── board_tab.py     # Tab for editing board
+│   └── piece_tab.py     # Tab for editing pieces
 ├── utils/
 │   ├── __init__.py
 │   └── file_io.py       # JSON save/load/export/import
@@ -104,6 +112,7 @@ tests/
 ## Implementation Phases
 
 ### Phase 0: Research (✅ COMPLETE)
+
 - GUI Framework Selection: PySide6 chosen for performance and cross-platform support
 - Backtracking Visualization: Thread-based solver with Qt signals
 - Testing Strategy: pytest + pytest-qt with mocked GUI components
@@ -112,6 +121,7 @@ tests/
 **Output**: `research.md` (923 lines)
 
 ### Phase 1: Design (✅ COMPLETE)
+
 - Data Models: PuzzlePiece, GameBoard, PuzzleState, PuzzleConfiguration
 - GUI Event Contracts: Qt signal/slot definitions (gui-events.json)
 - JSON Schema: Puzzle configuration file format (json-schema.json)
@@ -121,6 +131,7 @@ tests/
 **Output**: `data-model.md`, `quickstart.md`, `contracts/*`
 
 ### Phase 2: Implementation (PENDING)
+
 - Create source code structure (src/, tests/)
 - Implement models (piece, board, puzzle_state, puzzle_config)
 - Implement logic (solver, validator, rotation)
@@ -136,7 +147,7 @@ tests/
 ## Next Steps
 
 1. **Generate Implementation Tasks**: Run `/speckit.tasks` to generate detailed implementation tasks
-2. **Review Phase 1 Artifacts**: Verify research.md, data-model.md, quickstart.md, and contracts/* are complete
+2. **Review Phase 1 Artifacts**: Verify research.md, data-model.md, quickstart.md, and contracts/\* are complete
 3. **Begin Implementation**: Start with models layer, then logic, then GUI
 4. **Run Quality Gates**: Ensure ruff, mypy, and tests pass at each milestone
 5. **Update Documentation**: Keep spec.md and other documentation in sync with implementation
@@ -147,7 +158,7 @@ tests/
 - [x] Constitution Check: All 5 principles pass
 - [x] Project Structure: Single project with clear module boundaries defined
 - [x] Phase 0 Research: research.md complete (GUI framework, visualization, testing, dependencies)
-- [x] Phase 1 Design: data-model.md, quickstart.md, contracts/* complete
+- [x] Phase 1 Design: data-model.md, quickstart.md, contracts/\* complete
 - [x] Agent Context: opencode context updated in AGENTS.md
 - [x] All artifacts in correct location: `specs/001-polyomino-puzzle-solver/`
 

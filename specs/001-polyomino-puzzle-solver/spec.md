@@ -32,11 +32,15 @@ The user launches the application and sees a graphical interface where they can 
 
 **Acceptance Scenarios**:
 
-1. **Given** the application is launched, **When** the user draws a shape on the grid editor, **Then** the shape is visually displayed and stored as a defined piece
-2. **Given** the application is launched, **When** the user sets the board dimensions (width and height), **Then** the board boundary is displayed in the editor
-3. **Given** the application is launched, **When** the user marks cells as initially filled, **Then** those cells are displayed as blocked and unavailable for piece placement
-4. **Given** multiple pieces have been defined, **When** the user selects a piece, **Then** the piece shape is highlighted in the editor
-5. **Given** a piece has been defined, **When** the user deletes it, **Then** the piece is removed from the configuration
+1. **Given** the application is launched, **When** the user switches to the "Pieces" tab, **Then** the piece editor is displayed with full screen height available
+2. **Given** the application is launched, **When** the user switches to the "Board" tab, **Then** the board editor is displayed with full screen height available
+3. **Given** the user is in the Pieces tab, **When** they click and drag on the grid, **Then** cells are painted following the cursor motion
+4. **Given** the user is in either editor tab, **When** they right-click on a cell, **Then** the cell toggles between filled and empty states
+5. **Given** the user is in the Board tab, **When** they set the board dimensions (width and height), **Then** the board grid is automatically resized to fit within the visible screen area
+6. **Given** the user is in the Board tab, **When** they mark cells as initially filled, **Then** those cells are displayed as blocked and unavailable for piece placement
+7. **Given** the user is in the Pieces tab, **When** they draw a shape on the grid, **Then** the shape is visually displayed and stored as a defined piece
+8. **Given** multiple pieces have been defined, **When** the user selects a piece from the list, **Then** the piece shape is highlighted in the editor
+9. **Given** a piece has been defined, **When** the user deletes it, **Then** the piece is removed from the configuration
 
 ---
 
@@ -95,16 +99,23 @@ The user can save puzzle configurations for later use and load previously saved 
 ### Functional Requirements
 
 - **FR-001**: System MUST provide a graphical interface for defining polyomino piece shapes on a grid
+- **FR-001a**: System MUST use a tabbed interface with separate tabs for "Pieces" and "Board" editing to maximize available screen space
+- **FR-001b**: System MUST resize piece and board grid displays to fit within the visible screen area without requiring scrolling
+- **FR-001c**: System MUST use consistent interaction patterns for both piece editor and board editor:
+  - Left-click to add/remove cells
+  - Click-and-drag to paint multiple cells
+  - Right-click to toggle cell state
 - **FR-002**: System MUST allow users to specify board dimensions through the graphical interface, with maximum dimensions of 50×50 cells
 - **FR-003**: System MUST support defining multiple polyomino pieces of various shapes and sizes
 - **FR-004**: System MUST validate that piece shapes are contiguous and contain at least one grid cell
 - **FR-005**: System MUST visualize piece types with clear visual distinction in both editor and visualization windows
-- **FR-005a**: System MUST precompute all possible transformations for each piece type before solving begins
-- **FR-005b**: Precomputed transformations MUST include rotations at 0°, 90°, 180°, and 270° plus mirrored versions of each rotation (8 total orientations per piece)
-- **FR-005c**: System MUST allow users to define board configurations with cells that are initially filled (blocked)
-- **FR-005d**: System MUST provide manual controls for placing blocked cells on the board in the grid editor
-- **FR-005e**: System MUST support importing board configurations with pre-filled cells from JSON files
-- **FR-005f**: Initially filled cells MUST be treated as unavailable for piece placement during solving
+- **FR-005a**: System MUST generate unique colors for each piece type dynamically during visualization (pieces do not store color attributes)
+- **FR-005b**: System MUST automatically resize grid displays to fit within the visible screen area
+- **FR-005c**: Precomputed transformations MUST include rotations at 0°, 90°, 180°, and 270° plus mirrored versions of each rotation (8 total orientations per piece)
+- **FR-005d**: System MUST allow users to define board configurations with cells that are initially filled (blocked)
+- **FR-005e**: System MUST provide manual controls for placing blocked cells on the board in the grid editor
+- **FR-005f**: System MUST support importing board configurations with pre-filled cells from JSON files
+- **FR-005g**: Initially filled cells MUST be treated as unavailable for piece placement during solving
 - **FR-006**: System MUST provide a "Solve" action that triggers the solving algorithm
 - **FR-007**: System MUST open a separate visualization window when solving begins
 - **FR-008**: System MUST display the board grid in the visualization window
@@ -123,7 +134,7 @@ The user can save puzzle configurations for later use and load previously saved 
 
 ### Key Entities
 
-- **Polyomino Piece**: Represents a connected shape made of square grid cells, characterized by its shape (pattern of cells), its precomputed transformation set (8 orientations), and current orientation state during solving
+- **Polyomino Piece**: Represents a connected shape made of square grid cells, characterized by its shape (pattern of cells) and its precomputed transformation set (8 orientations). Pieces do not include color or ID attributes—these are generated dynamically by the visualization system.
 - **Board**: Represents the rectangular grid area where pieces must be placed without overlap to solve the puzzle, characterized by its width, height, initially filled (blocked) cells, and dynamic cell occupancy state during solving
 - **Puzzle Configuration**: Represents a complete puzzle definition containing the board dimensions and the set of polyomino pieces that must be placed
 - **Solution State**: Represents the current state of the solving process, including the current board configuration, pieces placed, placement order, and backtracking history
@@ -139,6 +150,9 @@ The user can save puzzle configurations for later use and load previously saved 
 - **SC-005**: 80% of users can correctly identify when backtracking occurs in the visualization (verified through user testing)
 - **SC-006**: The solver finds valid solutions for all correctly configured solvable puzzles (no false negatives)
 - **SC-007**: The solver correctly identifies unsolvable configurations (no false positives)
+- **SC-008**: 90% of users find the tabbed interface more usable than a split-pane design (verified through user testing)
+- **SC-009**: The entire board is visible on screen without scrolling for all board sizes up to 50×50 cells
+- **SC-010**: Users can switch between piece and board editing without losing context or having to resize windows
 
 ## Assumptions
 
@@ -151,6 +165,10 @@ The user can save puzzle configurations for later use and load previously saved 
 - Precomputing all 8 transformations (4 rotations × 2 mirrors) before solving significantly improves solving performance compared to computing transformations on-demand
 - Initially filled cells on the board create permanent obstacles that cannot be covered by puzzle pieces
 - Board configurations with initially filled cells should be treated as distinct puzzle types from empty boards of the same dimensions
+- Tabbed interface provides better usability by maximizing vertical space for grid editing
+- Auto-resizing grids ensures the entire board/piece is visible regardless of dimensions
+- Piece colors are generated dynamically during visualization and do not need to be persisted with piece definitions
+- Consistent interaction patterns (click, drag, right-click) across both editors reduces cognitive load
 
 ## Out of Scope
 

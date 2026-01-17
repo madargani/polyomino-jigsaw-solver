@@ -18,7 +18,7 @@ class PuzzleConfiguration:
         board_width: Board width in cells
         board_height: Board height in cells
         blocked_cells: Initially filled (blocked) cell positions
-        pieces: List of puzzle pieces
+        pieces: Dictionary of piece to count
         created_at: Timestamp when configuration was created
         modified_at: Timestamp of last modification
     """
@@ -28,7 +28,7 @@ class PuzzleConfiguration:
         name: str,
         board_width: int,
         board_height: int,
-        pieces: list[PuzzlePiece],
+        pieces: dict[PuzzlePiece, int] | None = None,
         blocked_cells: set[tuple[int, int]] | None = None,
     ) -> None:
         """Initialize a puzzle configuration.
@@ -37,7 +37,7 @@ class PuzzleConfiguration:
             name: User-defined puzzle name
             board_width: Board width in cells (1-50)
             board_height: Board height in cells (1-50)
-            pieces: List of puzzle pieces
+            pieces: Dictionary mapping piece to count (how many of that piece)
             blocked_cells: Set of initially filled (blocked) cell positions
 
         Raises:
@@ -49,8 +49,6 @@ class PuzzleConfiguration:
             raise ValueError("Board width must be between 1 and 50")
         if not (1 <= board_height <= 50):
             raise ValueError("Board height must be between 1 and 50")
-        if not pieces:
-            raise ValueError("At least one piece is required")
 
         # Validate blocked cells are within bounds
         if blocked_cells:
@@ -66,7 +64,7 @@ class PuzzleConfiguration:
         self._board_width = board_width
         self._board_height = board_height
         self._blocked_cells = blocked_cells.copy() if blocked_cells else set()
-        self._pieces = pieces
+        self._pieces = pieces.copy() if pieces else {}
         self._created_at = datetime.utcnow()
         self._modified_at = datetime.utcnow()
 
@@ -99,8 +97,8 @@ class PuzzleConfiguration:
         return self._blocked_cells.copy()
 
     @property
-    def pieces(self) -> list[PuzzlePiece]:
-        """Get the list of pieces."""
+    def pieces(self) -> dict[PuzzlePiece, int]:
+        """Get the dictionary of pieces with counts."""
         return self._pieces.copy()
 
     @property
@@ -118,6 +116,71 @@ class PuzzleConfiguration:
         """Get number of cells available for piece placement (excluding blocked cells)."""
         return self._board_width * self._board_height - len(self._blocked_cells)
 
+    @property
+    def is_empty(self) -> bool:
+        """Check if configuration has no pieces."""
+        return len(self._pieces) == 0
+
+    def get_available_area(self) -> int:
+        """Get number of cells available for piece placement (excluding blocked cells)."""
+        return self._board_width * self._board_height - len(self._blocked_cells)
+
+    def get_total_piece_area(self) -> int:
+        """Get total area of all pieces accounting for counts.
+
+        Returns:
+            Sum of all piece areas multiplied by their counts
+        """
+        total = 0
+        for piece, count in self._pieces.items():
+            total += piece.area * count
+        return total
+
+    def get_all_pieces(self) -> list[PuzzlePiece]:
+        """Get list of all pieces (expanding counts).
+
+        Returns:
+            List of pieces with each piece repeated according to its count
+        """
+        all_pieces = []
+        for piece, count in self._pieces.items():
+            all_pieces.extend([piece] * count)
+        return all_pieces
+
+    def get_piece_counts(self) -> dict[str, int]:
+        """Get mapping of piece names to their counts.
+
+        Returns:
+            Dictionary of piece_name -> count
+        """
+        return {piece.name: count for piece, count in self._pieces.items()}
+
+    def update_piece(self, piece: PuzzlePiece, count: int = 1) -> None:
+        """Update an existing piece in the configuration.
+
+        Args:
+            piece: Updated PuzzlePiece with same name
+            count: Number of copies of this piece
+
+        Raises:
+            ValueError: If piece not found or shape is invalid
+        """
+        # Validate new shape
+        shape_errors = validate_piece_shape(piece.shape)
+        if shape_errors:
+            raise ValueError(f"Piece {piece.name}: {shape_errors[0].message}")
+
+        if piece not in self._pieces:
+            raise ValueError(f"Piece with name '{piece.name}' not found")
+
+        self._pieces[piece] = count
+        self._modified_at = datetime.utcnow()
+
+    def clear_pieces(self) -> None:
+        """Remove all pieces from the configuration."""
+        self._pieces.clear()
+        self._modified_at = datetime.utcnow()
+
     def validate(self) -> list[str]:
         """Validate the configuration.
 
@@ -126,19 +189,24 @@ class PuzzleConfiguration:
         """
         errors: list[str] = []
 
-        # Check piece IDs are unique
-        piece_ids = [piece.id for piece in self._pieces]
-        if len(piece_ids) != len(set(piece_ids)):
-            errors.append("Piece IDs must be unique")
+        # Check piece names are unique
+        piece_names = [piece.name for piece in self._pieces]
+        if len(piece_names) != len(set(piece_names)):
+            errors.append("Piece names must be unique")
+
+        # Check piece counts are positive
+        for piece, count in self._pieces.items():
+            if count <= 0:
+                errors.append(f"Piece '{piece.name}' has invalid count {count}")
 
         # Check piece contiguity using centralized validator
         for piece in self._pieces:
             shape_errors = validate_piece_shape(piece.shape)
             for error in shape_errors:
-                errors.append(f"Piece {piece.id}: {error.message}")
+                errors.append(f"Piece {piece.name}: {error.message}")
 
         # Check total piece area vs available board area
-        piece_area = self.get_piece_area()
+        piece_area = self.get_total_piece_area()
         board_area = self.get_board_area()
 
         if piece_area > board_area:
@@ -153,56 +221,64 @@ class PuzzleConfiguration:
 
         return errors
 
-    def add_piece(self, piece: PuzzlePiece) -> None:
+    def add_piece(self, piece: PuzzlePiece, count: int = 1) -> None:
         """Add a piece to the configuration.
 
         Args:
             piece: Puzzle piece to add
+            count: Number of copies to add (default: 1)
 
         Raises:
-            ValueError: If piece is invalid or duplicate ID
+            ValueError: If piece is invalid or duplicate name
         """
         # Use centralized validation
         shape_errors = validate_piece_shape(piece.shape)
         if shape_errors:
-            raise ValueError(f"Piece {piece.id}: {shape_errors[0].message}")
+            raise ValueError(f"Piece {piece.name}: {shape_errors[0].message}")
 
-        # Check for duplicate ID
-        for existing_piece in self._pieces:
-            if existing_piece.id == piece.id:
-                raise ValueError(f"Piece with ID '{piece.id}' already exists")
+        # Check for duplicate name
+        if piece in self._pieces:
+            self._pieces[piece] += count
+        else:
+            self._pieces[piece] = count
 
-        self._pieces.append(piece)
         self._modified_at = datetime.utcnow()
 
-    def remove_piece(self, piece_id: str) -> None:
+    def remove_piece(self, piece: PuzzlePiece, count: int = 1) -> None:
         """Remove a piece from the configuration.
 
         Args:
-            piece_id: ID of the piece to remove
+            piece: Piece to remove
+            count: Number of copies to remove (default: 1)
 
         Raises:
-            ValueError: If piece_id not found
+            ValueError: If piece not found or count exceeds available
         """
-        for i, piece in enumerate(self._pieces):
-            if piece.id == piece_id:
-                self._pieces.pop(i)
-                self._modified_at = datetime.utcnow()
-                return
+        if piece not in self._pieces:
+            raise ValueError(f"Piece with name '{piece.name}' not found")
 
-        raise ValueError(f"Piece with ID '{piece_id}' not found")
+        if self._pieces[piece] < count:
+            raise ValueError(
+                f"Cannot remove {count} of piece '{piece.name}', only {self._pieces[piece]} available"
+            )
 
-    def get_piece_by_id(self, piece_id: str) -> PuzzlePiece | None:
-        """Get a piece by its ID.
+        self._pieces[piece] -= count
+        if self._pieces[piece] == 0:
+            del self._pieces[piece]
+
+        self._modified_at = datetime.utcnow()
+
+    def get_piece_by_name(self, name: str) -> PuzzlePiece | None:
+        """Get a piece by its name.
 
         Args:
-            piece_id: ID of the piece to find
+            name: Name of the piece to find
 
         Returns:
             PuzzlePiece if found, None otherwise
         """
         for piece in self._pieces:
-            if piece.id == piece_id:
+            if piece.name == name:
                 return piece
         return None
 
@@ -219,12 +295,12 @@ class PuzzleConfiguration:
         )
 
     def get_piece_area(self) -> int:
-        """Get total area of all pieces.
+        """Get total area of all pieces accounting for counts.
 
         Returns:
-            Sum of all piece areas
+            Sum of all piece areas multiplied by their counts
         """
-        return sum(piece.area for piece in self._pieces)
+        return self.get_total_piece_area()
 
     def get_board_area(self) -> int:
         """Get total board area.
@@ -240,13 +316,13 @@ class PuzzleConfiguration:
         Returns:
             True if total piece area equals available board area (total_area - blocked_cells)
         """
-        return self.get_piece_area() == self.available_area
+        return self.get_total_piece_area() == self.available_area
 
     def to_dict(self) -> dict[str, Any]:
         """Convert configuration to dictionary for serialization.
 
         Returns:
-            Dictionary representation including blocked_cells
+            Dictionary representation including blocked_cells and piece counts
         """
         return {
             "name": self._name,
@@ -254,12 +330,8 @@ class PuzzleConfiguration:
             "board_height": self._board_height,
             "blocked_cells": [[row, col] for row, col in self._blocked_cells],
             "pieces": [
-                {
-                    "id": piece.id,
-                    "shape": [[row, col] for row, col in piece.shape],
-                    "color": piece.color,
-                }
-                for piece in self._pieces
+                {"name": piece.name, "shape": list(piece.shape), "count": count}
+                for piece, count in self._pieces.items()
             ],
             "created_at": self._created_at.isoformat(),
             "modified_at": self._modified_at.isoformat(),
@@ -270,7 +342,7 @@ class PuzzleConfiguration:
         """Create configuration from dictionary.
 
         Args:
-            data: Dictionary representation including blocked_cells
+            data: Dictionary representation including piece counts
 
         Returns:
             New PuzzleConfiguration instance
@@ -283,18 +355,17 @@ class PuzzleConfiguration:
             if field not in data:
                 raise ValueError(f"Missing required field: {field}")
 
-        pieces = []
+        pieces_dict: dict[PuzzlePiece, int] = {}
         for piece_data in data["pieces"]:
-            if "id" not in piece_data or "shape" not in piece_data:
-                raise ValueError("Invalid piece data: missing id or shape")
+            if "name" not in piece_data or "shape" not in piece_data:
+                raise ValueError("Invalid piece data: missing name or shape")
 
             shape = set((row, col) for row, col in piece_data["shape"])
-            piece = PuzzlePiece(
-                id=piece_data["id"],
-                shape=shape,
-                color=piece_data.get("color", "#808080"),
-            )
-            pieces.append(piece)
+            piece = PuzzlePiece(name=piece_data["name"], shape=shape)
+            count = piece_data.get(
+                "count", 1
+            )  # Default to 1 for backward compatibility
+            pieces_dict[piece] = count
 
         # Handle blocked_cells (handle missing field for backward compatibility)
         blocked_cells: set[tuple[int, int]] = set()
@@ -305,7 +376,7 @@ class PuzzleConfiguration:
             name=data["name"],
             board_width=data["board_width"],
             board_height=data["board_height"],
-            pieces=pieces,
+            pieces=pieces_dict,
             blocked_cells=blocked_cells,
         )
 
@@ -330,10 +401,10 @@ class PuzzleConfiguration:
         Returns:
             New PuzzleConfiguration with identical state (including blocked cells)
         """
-        pieces_copy = [
-            PuzzlePiece(id=p.id, shape=p.shape.copy(), color=p.color)
-            for p in self._pieces
-        ]
+        pieces_copy = {
+            PuzzlePiece(name=p.name, shape=p.shape.copy()): count
+            for p, count in self._pieces.items()
+        }
         new_config = PuzzleConfiguration(
             name=self._name,
             board_width=self._board_width,
@@ -356,7 +427,13 @@ class PuzzleConfiguration:
             and self._board_height == other._board_height
             and self._blocked_cells == other._blocked_cells
             and len(self._pieces) == len(other._pieces)
-            and all(p1.id == p2.id for p1, p2 in zip(self._pieces, other._pieces))
+            and all(
+                p1.name == p2.name and c1 == c2
+                for (p1, c1), (p2, c2) in zip(
+                    sorted(self._pieces.items(), key=lambda x: x[0].name),
+                    sorted(other._pieces.items(), key=lambda x: x[0].name),
+                )
+            )
         )
 
     def __repr__(self) -> str:

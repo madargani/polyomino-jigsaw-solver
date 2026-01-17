@@ -7,9 +7,10 @@
 
 1. [Entity Overview](#entity-overview)
 2. [Core Entities](#core-entities)
-3. [Entity Relationships](#entity-relationships)
-4. [Validation Rules](#validation-rules)
-5. [State Management](#state-management)
+3. [Piece Dictionary Pattern](#piece-dictionary-pattern)
+4. [Entity Relationships](#entity-relationships)
+5. [Validation Rules](#validation-rules)
+6. [State Management](#state-management)
 
 ---
 
@@ -17,9 +18,9 @@
 
 | Entity | Description | Module | Key Attributes |
 |--------|-------------|--------|----------------|
-| **PuzzlePiece** | Represents a connected shape made of square grid cells | `models/piece.py` | shape, color, id |
+| **PuzzlePiece** | Represents a connected shape made of square grid cells | `models/piece.py` | shape, name |
 | **GameBoard** | Represents the rectangular grid area where pieces must be placed | `models/board.py` | width, height, cells, blocked_cells |
-| **PuzzleState** | Represents the current state of the solving process | `models/puzzle_state.py` | board, placed_pieces, backtrack_history |
+| **PuzzleState** | Represents the current state of the solving process | `models/puzzle_state.py` | board, placed_pieces, remaining_pieces |
 | **PuzzleConfiguration** | Represents a complete puzzle definition | `models/puzzle_config.py` | board_dimensions, pieces |
 
 ---
@@ -28,7 +29,7 @@
 
 ### PuzzlePiece
 
-**Purpose**: Represents a single polyomino piece with its shape, color, and unique identifier.
+**Purpose**: Represents a single polyomino piece with its shape. Color is generated dynamically during visualization and not stored with the piece. Pieces are identified by a unique name for dictionary storage.
 
 **Location**: `src/models/piece.py`
 
@@ -36,9 +37,8 @@
 
 | Attribute | Type | Description | Constraints |
 |-----------|------|-------------|-------------|
-| `id` | `str` | Unique identifier for the piece | Required, format: `piece-{n}` or custom name |
+| `name` | `str` | Unique identifier for the piece shape | Required, unique within puzzle |
 | `shape` | `Set[Tuple[int, int]]` | Set of (row, col) coordinates defining the piece shape | Required, non-empty, coordinates relative to origin (0,0) |
-| `color` | `str` | Display color for the piece | Required, hex format or named color |
 | `area` | `int` | Number of cells in the piece (calculated) | Computed from `len(shape)`, ≥ 1 |
 | `precomputed_orientations` | `List['PuzzlePiece']` | Precomputed unique orientations (8 max) | Computed on init, includes 4 rotations × 2 mirrors |
 
@@ -46,22 +46,35 @@
 
 ```python
 class PuzzlePiece:
-    def __init__(self, id: str, shape: Set[Tuple[int, int]], color: str) -> None:
+    def __init__(self, name: str, shape: Set[Tuple[int, int]]) -> None:
         """Initialize a puzzle piece.
 
         Args:
-            id: Unique identifier for the piece
+            name: Unique identifier for the piece shape
             shape: Set of (row, col) coordinates defining the piece shape
-            color: Display color (hex or named)
 
         Raises:
             ValueError: If shape is empty or not contiguous
         """
-        self.id = id
+        self.name = name
         self.shape = shape
-        self.color = color
         # Precompute all 8 orientations (4 rotations × 2 mirrors) for performance
         self.precomputed_orientations = self._compute_all_orientations()
+
+    @classmethod
+    def with_id(cls, shape: Set[Tuple[int, int]], id: str) -> 'PuzzlePiece':
+        """Factory method to create a piece with an identifier for internal tracking.
+
+        Args:
+            shape: Set of (row, col) coordinates defining the piece shape
+            id: Unique identifier for the piece (used internally, not persisted)
+
+        Returns:
+            PuzzlePiece instance
+        """
+        piece = cls(shape)
+        piece._id = id
+        return piece
 
     def _compute_all_orientations(self) -> List['PuzzlePiece']:
         """Compute and cache all unique orientations (8 max: 4 rotations × 2 mirrors).
@@ -171,9 +184,8 @@ class PuzzlePiece:
 2. **Contiguous**: All cells must be connected (4-directional adjacency)
 3. **Origin relative**: Shape should be normalized (min row/col = 0,0)
 4. **Unique rotations**: `get_rotations()` must return deduplicated orientations
-5. **Color format**: Color must be valid hex or named color (e.g., "#FF0000" or "red")
-6. **Precomputed orientations**: Must include 8 total orientations (4 rotations × 2 mirrors), deduplicated
-7. **Orientation count**: `get_precomputed_orientations()` returns 1-8 unique orientations based on piece symmetry
+5. **Precomputed orientations**: Must include 8 total orientations (4 rotations × 2 mirrors), deduplicated
+6. **Orientation count**: `get_precomputed_orientations()` returns 1-8 unique orientations based on piece symmetry
 
 #### State Transitions
 
@@ -366,7 +378,66 @@ class GameBoard:
      │                              │
      │                              └─ remove_piece(piece, pos) ───► [Empty Board]
      │
-     └─ clear() ──────────────────► [Empty Board]
+      └─ clear() ──────────────────► [Empty Board]
+```
+
+---
+
+## Piece Dictionary Pattern
+
+### Why Use a Dictionary for Pieces?
+
+Many polyomino puzzles require multiple copies of the same piece shape. For example:
+- A puzzle might need 4 L-tetrominoes, 2 T-tetrominoes, and 1 I-tetromino
+- Storing each piece separately would require repeating the same shape data
+- A dictionary `Dict[PuzzlePiece, int]` elegantly represents this: `{piece_shape: count}`
+
+### Benefits
+
+1. **Memory Efficiency**: Each unique piece shape is stored once, regardless of count
+2. **Clear Semantics**: `{L_piece: 3}` clearly means "three L-tetrominoes"
+3. **Easy Updates**: Increment/decrement counts when adding/removing pieces
+4. **Natural JSON Format**: `{"name": "L-tetromino", "shape": [...], "count": 3}` is intuitive
+5. **Solver Integration**: Tracking remaining pieces becomes simple count management
+
+### Example: Multiple Copies of Same Piece
+
+```python
+# Create unique piece definitions
+l_piece = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+t_piece = PuzzlePiece(name="T-tetromino", shape={(0, 0), (0, 1), (0, 2), (1, 1)})
+
+# A puzzle with 3 L's and 2 T's
+config = PuzzleConfiguration(
+    name="My Puzzle",
+    board_width=6,
+    board_height=6,
+    pieces={
+        l_piece: 3,  # Three L-tetrominoes
+        t_piece: 2   # Two T-tetrominoes
+    }
+)
+
+# Total piece count: 5
+print(f"Total pieces: {sum(config.pieces.values())}")
+
+# Piece area: 3*4 + 2*4 = 20 cells
+print(f"Total area: {config.get_piece_area()}")
+```
+
+### Solver Integration
+
+The solver receives the piece dictionary and manages counts during solving:
+
+```python
+# Solver receives: {L_piece: 3, T_piece: 2}
+state = PuzzleState(board, pieces_dict)
+
+# Place an L-piece
+state.place_piece(L_piece, (0, 0))  # L_piece count decrements to 2
+
+# Backtrack: remove and restore count
+removed = state.remove_piece((0, 0))  # L_piece count increments back to 3
 ```
 
 ---
@@ -383,9 +454,8 @@ class GameBoard:
 |-----------|------|-------------|-------------|
 | `board` | `GameBoard` | Current board configuration | Required |
 | `placed_pieces` | `List[Tuple[PuzzlePiece, Tuple[int, int]]]` | List of (piece, position) tuples | Required, ordered by placement |
-| `available_pieces` | `List[PuzzlePiece]` | Pieces not yet placed | Required |
+| `remaining_pieces` | `Dict[PuzzlePiece, int]` | Dictionary of piece to remaining count | Required, piece → count mapping |
 | `backtrack_history` | `List[Dict[str, Any]]` | History of solver operations | Required, append-only |
-| `current_index` | `int` | Index of piece being placed | Required, 0 ≤ current_index < len(pieces) |
 
 #### Methods
 
@@ -394,36 +464,83 @@ class PuzzleState:
     def __init__(
         self,
         board: GameBoard,
-        pieces: List[PuzzlePiece]
+        pieces: Dict[PuzzlePiece, int]
     ) -> None:
         """Initialize puzzle state with board and pieces.
 
         Args:
             board: The game board
-            pieces: List of puzzle pieces to place
+            pieces: Dictionary mapping piece to count (how many of that piece remain)
         """
+        self.board = board
+        self.remaining_pieces = pieces.copy()  # Copy to avoid mutation
+        self.placed_pieces = []
+        self.backtrack_history = []
 
     def place_piece(
         self,
         piece: PuzzlePiece,
         position: Tuple[int, int]
-    ) -> None:
+    ) -> bool:
         """Place a piece and record in state.
 
         Args:
             piece: The puzzle piece to place
             position: (row, col) position to place piece
 
-        Raises:
-            ValueError: If piece cannot be placed
-        """
+        Returns:
+            True if piece was placed successfully
 
-    def remove_piece(self, position: Tuple[int, int]) -> None:
-        """Remove a piece (backtrack).
+        Raises:
+            ValueError: If piece cannot be placed or no more of that piece remain
+        """
+        # Check if we have any of this piece remaining
+        if self.remaining_pieces.get(piece, 0) <= 0:
+            raise ValueError(f"No more pieces of type '{piece.name}' remaining")
+
+        # Check if piece can be placed on board
+        if not self.board.can_place_piece(piece, position):
+            return False
+
+        # Place the piece
+        self.board.place_piece(piece, position)
+        self.placed_pieces.append((piece, position))
+
+        # Decrement remaining count
+        self.remaining_pieces[piece] = self.remaining_pieces.get(piece, 0) - 1
+        if self.remaining_pieces[piece] == 0:
+            del self.remaining_pieces[piece]
+
+        return True
+
+    def remove_piece(self, position: Tuple[int, int]) -> Optional[PuzzlePiece]:
+        """Remove a piece from the board (backtrack).
 
         Args:
             position: (row, col) position to remove piece from
+
+        Returns:
+            The piece that was removed, or None if no piece at position
         """
+        # Find the piece at this position
+        for i, (piece, pos) in enumerate(self.placed_pieces):
+            if pos == position:
+                # Remove from board
+                self.board.remove_piece(piece, position)
+                # Remove from placed pieces
+                self.placed_pieces.pop(i)
+                # Increment remaining count
+                self.remaining_pieces[piece] = self.remaining_pieces.get(piece, 0) + 1
+                return piece
+        return None
+
+    def get_total_remaining_pieces(self) -> int:
+        """Get total count of all remaining pieces.
+
+        Returns:
+            Sum of all piece counts in remaining_pieces
+        """
+        return sum(self.remaining_pieces.values())
 
     def record_operation(
         self,
@@ -504,7 +621,7 @@ class PuzzleState:
 
 ### PuzzleConfiguration
 
-**Purpose**: Represents a complete puzzle definition containing board dimensions and the set of polyomino pieces.
+**Purpose**: Represents a complete puzzle definition containing board dimensions and the set of polyomino pieces with counts.
 
 **Location**: `src/models/puzzle_config.py`
 
@@ -516,7 +633,7 @@ class PuzzleState:
 | `board_width` | `int` | Board width in cells | Required, 1 ≤ width ≤ 50 |
 | `board_height` | `int` | Board height in cells | Required, 1 ≤ height ≤ 50 |
 | `blocked_cells` | `Set[Tuple[int, int]]` | Initially filled (blocked) cell positions | Optional, defaults to empty set |
-| `pieces` | `List[PuzzlePiece]` | List of puzzle pieces | Required, non-empty |
+| `pieces` | `Dict[PuzzlePiece, int]` | Dictionary of piece to count | Required, non-empty, count ≥ 1 |
 | `created_at` | `datetime` | Timestamp when configuration was created | Required |
 | `modified_at` | `datetime` | Timestamp of last modification | Required |
 
@@ -529,7 +646,7 @@ class PuzzleConfiguration:
         name: str,
         board_width: int,
         board_height: int,
-        pieces: List[PuzzlePiece],
+        pieces: Dict[PuzzlePiece, int],
         blocked_cells: Optional[Set[Tuple[int, int]]] = None
     ) -> None:
         """Initialize a puzzle configuration.
@@ -538,7 +655,7 @@ class PuzzleConfiguration:
             name: User-defined puzzle name
             board_width: Board width in cells (1-50)
             board_height: Board height in cells (1-50)
-            pieces: List of puzzle pieces
+            pieces: Dictionary mapping piece to count (how many of that piece)
             blocked_cells: Set of initially filled (blocked) cell positions
 
         Raises:
@@ -552,25 +669,46 @@ class PuzzleConfiguration:
             List of validation errors (empty if valid)
         """
 
-    def add_piece(self, piece: PuzzlePiece) -> None:
+    def add_piece(self, piece: PuzzlePiece, count: int = 1) -> None:
         """Add a piece to the configuration.
 
         Args:
             piece: Puzzle piece to add
+            count: Number of copies to add (default: 1)
 
         Raises:
-            ValueError: If piece is invalid or duplicate ID
+            ValueError: If piece is invalid
         """
 
-    def remove_piece(self, piece_id: str) -> None:
+    def remove_piece(self, piece: PuzzlePiece, count: int = 1) -> None:
         """Remove a piece from the configuration.
 
         Args:
-            piece_id: ID of the piece to remove
+            piece: Piece to remove
+            count: Number of copies to remove (default: 1)
 
         Raises:
-            ValueError: If piece_id not found
+            ValueError: If piece not found or count exceeds available
         """
+
+    def get_all_pieces(self) -> List[PuzzlePiece]:
+        """Get list of all pieces (expanding counts).
+
+        Returns:
+            List of pieces with each piece repeated according to its count
+        """
+        all_pieces = []
+        for piece, count in self.pieces.items():
+            all_pieces.extend([piece] * count)
+        return all_pieces
+
+    def get_piece_counts(self) -> Dict[str, int]:
+        """Get mapping of piece names to their counts.
+
+        Returns:
+            Dictionary of piece_name -> count
+        """
+        return {piece.name: count for piece, count in self.pieces.items()}
 
     def get_board(self) -> GameBoard:
         """Create a GameBoard from configuration.
@@ -585,11 +723,15 @@ class PuzzleConfiguration:
         )
 
     def get_piece_area(self) -> int:
-        """Get total area of all pieces.
+        """Get total area of all pieces (accounting for counts).
 
         Returns:
-            Sum of all piece areas
+            Sum of all piece areas multiplied by their counts
         """
+        total = 0
+        for piece, count in self.pieces.items():
+            total += len(piece.shape) * count
+        return total
 
     def get_board_area(self) -> int:
         """Get total board area.
@@ -609,7 +751,7 @@ class PuzzleConfiguration:
         """Convert configuration to dictionary for serialization.
 
         Returns:
-            Dictionary representation including blocked_cells
+            Dictionary representation including blocked_cells and piece counts
         """
         return {
             'name': self.name,
@@ -617,8 +759,8 @@ class PuzzleConfiguration:
             'board_height': self.board_height,
             'blocked_cells': list(self.blocked_cells),
             'pieces': [
-                {'id': p.id, 'shape': list(p.shape), 'color': p.color}
-                for p in self.pieces
+                {'name': piece.name, 'shape': list(piece.shape), 'count': count}
+                for piece, count in self.pieces.items()
             ],
             'created_at': self.created_at.isoformat(),
             'modified_at': self.modified_at.isoformat()
@@ -629,7 +771,7 @@ class PuzzleConfiguration:
         """Create configuration from dictionary.
 
         Args:
-            data: Dictionary representation including blocked_cells
+            data: Dictionary representation including piece counts
 
         Returns:
             New PuzzleConfiguration instance
@@ -642,20 +784,18 @@ class PuzzleConfiguration:
         if 'blocked_cells' in data:
             blocked_cells = set(tuple(cell) for cell in data['blocked_cells'])
 
-        pieces = [
-            PuzzlePiece(
-                id=p['id'],
-                shape=set(tuple(coord) for coord in p['shape']),
-                color=p['color']
-            )
-            for p in data['pieces']
-        ]
+        # Parse pieces with counts
+        pieces_dict: Dict[PuzzlePiece, int] = {}
+        for p in data['pieces']:
+            piece = PuzzlePiece(name=p['name'], shape=set(tuple(coord) for coord in p['shape']))
+            count = p.get('count', 1)  # Default to 1 for backward compatibility
+            pieces_dict[piece] = count
 
         return cls(
             name=data['name'],
             board_width=data['board_width'],
             board_height=data['board_height'],
-            pieces=pieces,
+            pieces=pieces_dict,
             blocked_cells=blocked_cells
         )
 
@@ -669,12 +809,13 @@ class PuzzleConfiguration:
 
 #### Validation Rules
 
-1. **Non-empty pieces**: At least one piece must be defined
-2. **Unique piece IDs**: All piece IDs must be unique
-3. **Valid dimensions**: Board dimensions must be 1-50
-4. **Blocked cells in bounds**: All blocked_cells positions must be within board boundaries
-5. **Area check**: Total piece area must equal available board area (total_area - blocked_cells) (optional warning, not error)
-6. **Unique name**: Puzzle name must be unique within saved puzzles
+1. **Non-empty pieces**: At least one piece must be defined with count ≥ 1
+2. **Valid dimensions**: Board dimensions must be 1-50
+3. **Blocked cells in bounds**: All blocked_cells positions must be within board boundaries
+4. **Positive counts**: All piece counts must be ≥ 1
+5. **Unique piece names**: All piece names within a configuration must be unique
+6. **Area check**: Total piece area must equal available board area (total_area - blocked_cells) (optional warning, not error)
+7. **Unique name**: Puzzle name must be unique within saved puzzles
 
 #### State Transitions
 
@@ -702,17 +843,16 @@ class PuzzleConfiguration:
 │ - name              │◄────────────────┐
 │ - board_width       │                 │
 │ - board_height      │                 │
-│ - pieces[]          │                 │
+│ - pieces{}          │                 │
 └─────────────────────┘                 │
          │ 1                           │
          │ has                         │ 1..*
          │                             │
          ▼                             │
-┌─────────────────────┐   1..*         │
-│    PuzzlePiece       │◄───────────────┘
-│ - id                │
+┌─────────────────────┐   1..*         │    count
+│    PuzzlePiece       │◄───────────────┼───────────► int
+│ - name              │
 │ - shape             │
-│ - color             │
 └─────────────────────┘
          │
          │ 0..*
@@ -733,9 +873,9 @@ class PuzzleConfiguration:
 │    PuzzleState      │                 │
 │ - board             │                 │
 │ - placed_pieces[]   │                 │
-│ - backtrack_history[]│                 │
+│ - remaining_pieces{}│                 │
 └─────────────────────┘                 │
-                                          │
+                                           │
          1..*                             │
          │ records                        │
          │                                │
@@ -746,17 +886,18 @@ class PuzzleConfiguration:
 
 | Relationship | Type | Description |
 |--------------|------|-------------|
-| **PuzzleConfiguration → PuzzlePiece** | 1..* | Configuration contains multiple pieces |
+| **PuzzleConfiguration → PuzzlePiece** | 1..* → count | Configuration contains unique pieces with counts (e.g., 3 L-tetrominoes, 2 I-tetrominoes) |
 | **PuzzlePiece → GameBoard** | 0..* | Pieces can be placed on board (many orientations) |
 | **GameBoard → PuzzleState** | 1 | Board is tracked by exactly one state during solving |
-| **PuzzleState → Operation History** | 1 | State records its own backtrack history |
+| **PuzzleState → Remaining Pieces** | 1..* → count | State tracks how many of each piece remain to be placed |
 
 ### Cascading Behaviors
 
-- **Deleting PuzzleConfiguration**: Does not delete pieces (pieces may be reused)
-- **Removing Piece from Configuration**: Invalidates any saved state referencing that piece
+- **Deleting PuzzleConfiguration**: Does not delete pieces (pieces may be reused in other configurations)
+- **Modifying Piece Count**: Changing count in PuzzleConfiguration.pieces affects total piece area calculation
 - **Clearing Board**: Does not affect PuzzleConfiguration (can rebuild board)
-- **Copying PuzzleState**: Creates deep copy of board and placed pieces
+- **Copying PuzzleState**: Creates deep copy of board, placed pieces, and remaining_pieces dictionary
+- **Adding Same Piece Twice**: Increments count in pieces dictionary (e.g., {L-piece: 2} → {L-piece: 3})
 
 ---
 
@@ -779,17 +920,17 @@ class PuzzleConfiguration:
    - **Enforcement**: Error in GameBoard.can_place_piece() and GameBoard.place_piece()
    - **Rationale**: Blocked cells are permanently unavailable for piece placement
 
-2. **Piece Placement Validity**
-   - **Rule**: All piece cells must be within board bounds
-   - **Enforcement**: Error in GameBoard.place_piece()
-   - **Rationale**: Prevents invalid state
+4. **Piece Count Validation**
+   - **Rule**: All piece counts must be ≥ 1
+   - **Enforcement**: Error in PuzzleConfiguration.__init__() and add_piece()
+   - **Rationale**: Negative or zero counts are invalid
 
-3. **Unique Piece IDs**
-   - **Rule**: All piece IDs in configuration must be unique
+5. **Unique Piece Names**
+   - **Rule**: All piece names within a configuration must be unique
    - **Enforcement**: Error in PuzzleConfiguration.add_piece()
-   - **Rationale**: Prevents confusion and state corruption
+   - **Rationale**: Piece name is the dictionary key for identification
 
-4. **Contiguous Piece Shapes**
+6. **Contiguous Piece Shapes**
    - **Rule**: All cells in a piece must be 4-connected
    - **Enforcement**: Error in PuzzlePiece.__init__()
    - **Rationale**: By definition, polyominoes are connected shapes
@@ -797,18 +938,24 @@ class PuzzleConfiguration:
 ### Validation Flow
 
 ```python
-# When creating a new puzzle
-config = PuzzleConfiguration(name, width, height, pieces)
+# When creating a new puzzle with piece counts
+l_piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+config = PuzzleConfiguration(
+    name="My Puzzle",
+    width=4,
+    height=4,
+    pieces={l_piece: 4}  # 4 L-tetrominoes
+)
 errors = config.validate()
 
 if errors:
     # Display errors to user
-    # e.g., "Piece area (25) does not match board area (24)"
+    # e.g., "Piece area (16) does not match board area (16)"
     pass
 else:
     # Proceed with solver
     board = config.get_board()
-    state = PuzzleState(board, pieces)
+    state = PuzzleState(board, config.pieces)  # Pass dictionary with counts
 ```
 
 ### Error Hierarchy
@@ -817,7 +964,8 @@ else:
    - Invalid dimensions
    - Empty piece shape
    - Non-contiguous piece
-   - Duplicate piece IDs
+   - Duplicate piece names
+   - Invalid piece counts (≤ 0)
    - Out-of-bounds placement
 
 2. **Warnings** (allow operation but inform user):
@@ -837,8 +985,8 @@ else:
 
 **Mutable** (modify in place):
 - `GameBoard.place_piece()`, `GameBoard.remove_piece()`, `GameBoard.clear()`
-- `PuzzleState.place_piece()`, `PuzzleState.remove_piece()`
-- `PuzzleConfiguration.add_piece()`, `PuzzleConfiguration.remove_piece()`
+- `PuzzleState.place_piece()`, `PuzzleState.remove_piece()` (modifies remaining_pieces dict)
+- `PuzzleConfiguration.add_piece()`, `PuzzleConfiguration.remove_piece()` (modifies pieces dict)
 
 ### Thread Safety Considerations
 
@@ -858,9 +1006,14 @@ else:
   "blocked_cells": [[0, 0], [0, 1], [2, 3]],
   "pieces": [
     {
-      "id": "piece-1",
-      "shape": [[0, 0], [0, 1], [1, 1]],
-      "color": "#FF0000"
+      "name": "L-tetromino",
+      "shape": [[0, 0], [1, 0], [1, 1], [1, 2]],
+      "count": 3
+    },
+    {
+      "name": "I-tetromino",
+      "shape": [[0, 0], [0, 1], [0, 2], [0, 3]],
+      "count": 2
     }
   ],
   "created_at": "2026-01-14T12:00:00Z",
@@ -885,25 +1038,22 @@ from models.piece import PuzzlePiece
 from models.board import GameBoard
 from models.puzzle_config import PuzzleConfiguration
 
-# Define pieces
-piece1 = PuzzlePiece(
-    id="tetromino-l",
-    shape={(0, 0), (1, 0), (1, 1), (1, 2)},
-    color="#FF0000"
-)
+# Define pieces (color is generated dynamically during visualization)
+# Each piece has a unique name for dictionary storage
+l_piece = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+t_piece = PuzzlePiece(name="T-tetromino", shape={(0, 0), (0, 1), (0, 2), (1, 1)})
+i_piece = PuzzlePiece(name="I-tetromino", shape={(0, 0), (0, 1), (0, 2), (0, 3)})
 
-piece2 = PuzzlePiece(
-    id="tetromino-t",
-    shape={(0, 0), (0, 1), (0, 2), (1, 1)},
-    color="#0000FF"
-)
-
-# Create configuration
+# Create configuration with piece counts (dictionary format)
 config = PuzzleConfiguration(
     name="Simple 4x4",
     board_width=4,
     board_height=4,
-    pieces=[piece1, piece2]
+    pieces={
+        l_piece: 2,  # 2 L-tetrominoes
+        t_piece: 1,  # 1 T-tetromino
+        i_piece: 1   # 1 I-tetromino
+    }
 )
 
 # Validate
@@ -912,6 +1062,7 @@ if errors:
     print("Validation errors:", errors)
 else:
     print("Configuration is valid!")
+    print(f"Total pieces: {sum(config.pieces.values())}")  # Output: Total pieces: 4
 ```
 
 ### Using the Solver
@@ -922,7 +1073,7 @@ from models.puzzle_state import PuzzleState
 
 # Create board and state
 board = config.get_board()
-state = PuzzleState(board, config.pieces)
+state = PuzzleState(board, config.pieces)  # Pass the dictionary directly
 
 # Run solver
 solver = BacktrackingSolver(callback_delay=0.1)
@@ -931,6 +1082,7 @@ result = solver.solve(config.pieces, board)
 if result:
     print("Puzzle solved!")
     print(f"Placements: {len(state.placed_pieces)}")
+    print(f"Remaining pieces: {state.get_total_remaining_pieces()}")
 else:
     print("No solution found")
 ```
