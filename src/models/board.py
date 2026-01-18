@@ -39,7 +39,7 @@ class GameBoard:
 
         self._width = width
         self._height = height
-        self._cells: dict[tuple[int, int], str | None] = {
+        self._cells: dict[tuple[int, int], int | None] = {
             (row, col): None for row in range(height) for col in range(width)
         }
 
@@ -53,8 +53,8 @@ class GameBoard:
                         f"Blocked cell {cell} is out of board bounds ({width}x{height})"
                     )
                 self._blocked_cells.add(cell)
-                # Mark blocked cells as occupied in the cells dict
-                self._cells[(row, col)] = "__BLOCKED__"
+                # Mark blocked cells as occupied in the cells dict (use -1 as special marker)
+                self._cells[(row, col)] = -1
 
     @property
     def width(self) -> int:
@@ -116,7 +116,7 @@ class GameBoard:
 
             # Check if cell is already occupied by a piece
             cell_content = self._cells.get((row, col))
-            if cell_content is not None and cell_content != "__BLOCKED__":
+            if cell_content is not None and cell_content != -1:
                 return False
 
         return True
@@ -147,7 +147,8 @@ class GameBoard:
         for row_offset, col_offset in piece_shape:
             row = position[0] + row_offset
             col = position[1] + col_offset
-            self._cells[(row, col)] = piece.name
+            # Store piece identifier based on shape hash
+            self._cells[(row, col)] = hash(frozenset(piece_shape))
 
         return True
 
@@ -170,11 +171,12 @@ class GameBoard:
         """
         piece_shape = piece.shape
         # Verify piece exists at position
+        piece_hash = hash(frozenset(piece_shape))
         for row_offset, col_offset in piece_shape:
             row = position[0] + row_offset
             col = position[1] + col_offset
-            if self._cells.get((row, col)) != piece.name:
-                raise ValueError(f"Piece {piece.name} not found at position {position}")
+            if self._cells.get((row, col)) != piece_hash:
+                raise ValueError(f"Piece not found at position {position}")
 
         # Remove the piece
         for row_offset, col_offset in piece_shape:
@@ -209,15 +211,13 @@ class GameBoard:
         return all(cell is not None for cell in self._cells.values())
 
     def is_empty(self) -> bool:
-        """Check if board is completely empty.
+        """Check if the board is completely empty.
 
         Returns:
             True if no pieces are placed (blocked cells are ignored)
         """
         # Check if any non-blocked cells are occupied
-        return all(
-            cell is None or cell == "__BLOCKED__" for cell in self._cells.values()
-        )
+        return all(cell is None or cell == -1 for cell in self._cells.values())
 
     def is_blocked(self, position: tuple[int, int]) -> bool:
         """Check if a cell is blocked (initially filled).
@@ -238,14 +238,14 @@ class GameBoard:
         """
         return self._blocked_cells.copy()
 
-    def get_piece_at(self, position: tuple[int, int]) -> str | None:
+    def get_piece_at(self, position: tuple[int, int]) -> int | None:
         """Get the piece ID at the specified position.
 
         Args:
             position: (row, col) position to query
 
         Returns:
-            Piece ID if cell is occupied, None otherwise
+            Piece ID (hash) if cell is occupied, None otherwise
         """
         return self._cells.get(position)
 

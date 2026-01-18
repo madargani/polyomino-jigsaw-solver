@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSpinBox,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -225,9 +226,7 @@ class PieceGridWidget(QWidget):
                     label,
                 )
 
-    def _get_cell_at_position(
-        self, pos_x: int, pos_y: int
-    ) -> tuple[int, int] | None:
+    def _get_cell_at_position(self, pos_x: int, pos_y: int) -> tuple[int, int] | None:
         """Get the cell coordinates at the given position.
 
         Args:
@@ -288,6 +287,94 @@ class PieceGridWidget(QWidget):
             self.update()
 
 
+class PieceListItemWidget(QWidget):
+    """Custom widget for piece list items with count controls.
+
+    Displays piece dimensions and cell count with +/- buttons for
+    adjusting the quantity of each piece type.
+    """
+
+    # Signals emitted when count buttons are clicked
+    increment_requested = Signal(PuzzlePiece)
+    decrement_requested = Signal(PuzzlePiece)
+
+    def __init__(
+        self, piece: PuzzlePiece, count: int, parent: QWidget | None = None
+    ) -> None:
+        """Initialize the piece list item widget.
+
+        Args:
+            piece: The puzzle piece this item represents
+            count: Current count of this piece type
+            parent: Parent widget
+        """
+        super().__init__(parent)
+        self._piece = piece
+        self._count = count
+        self._setup_ui()
+
+    def _setup_ui(self) -> None:
+        """Set up the widget layout and components."""
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(4)
+
+        # Label: "(3×4) (7 cells)"
+        self._label = QLabel(self._get_label_text())
+        self._label.setMinimumWidth(100)
+        self._label.setStyleSheet("font-weight: bold;")
+
+        # Minus button
+        self._minus_btn = QToolButton()
+        self._minus_btn.setText("-")
+        self._minus_btn.setFixedSize(28, 28)
+        self._minus_btn.setToolTip("Remove one")
+        self._minus_btn.clicked.connect(self._on_minus_clicked)
+
+        # Count label: "x3"
+        self._count_label = QLabel(self._get_count_text())
+        self._count_label.setFixedWidth(30)
+        self._count_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+
+        # Plus button
+        self._plus_btn = QToolButton()
+        self._plus_btn.setText("+")
+        self._plus_btn.setFixedSize(28, 28)
+        self._plus_btn.setToolTip("Add one")
+        self._plus_btn.clicked.connect(self._on_plus_clicked)
+
+        layout.addWidget(self._label)
+        layout.addWidget(self._minus_btn)
+        layout.addWidget(self._count_label)
+        layout.addWidget(self._plus_btn)
+        layout.addStretch()
+
+    def _get_label_text(self) -> str:
+        """Generate label like '(3×4) (7 cells)'."""
+        return f"({self._piece.width}×{self._piece.height}) ({len(self._piece.shape)} cells)"
+
+    def _get_count_text(self) -> str:
+        """Generate count text like 'x3'."""
+        return f"x{self._count}"
+
+    def _on_plus_clicked(self) -> None:
+        """Handle plus button click."""
+        self.increment_requested.emit(self._piece)
+
+    def _on_minus_clicked(self) -> None:
+        """Handle minus button click."""
+        self.decrement_requested.emit(self._piece)
+
+    def update_count(self, count: int) -> None:
+        """Update the displayed count.
+
+        Args:
+            count: New count value
+        """
+        self._count = count
+        self._count_label.setText(self._get_count_text())
+
+
 class PieceTab(QWidget):
     """Tab widget for piece creation and editing.
 
@@ -315,9 +402,9 @@ class PieceTab(QWidget):
         """
         super().__init__(parent)
 
-        self._pieces: list[PuzzlePiece] = []
+        self._pieces: dict[PuzzlePiece, int] = {}
         self._selected_piece: PuzzlePiece | None = None
-        self._piece_counter = 0
+        self._piece_counter = 0  # Only for generating unique labels
 
         self._init_ui()
 
@@ -339,8 +426,11 @@ class PieceTab(QWidget):
         # Piece list widget
         self._piece_list = QListWidget()
         self._piece_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        self._piece_list.setFixedWidth(150)
+        self._piece_list.setFixedWidth(200)
+        self._piece_list.setUniformItemSizes(True)
+        self._piece_list.setStyleSheet("QListWidget::item { min-height: 40px; }")
         self._piece_list.itemSelectionChanged.connect(self._on_piece_selection_changed)
+        self._piece_list.itemClicked.connect(self._on_piece_item_clicked)
         left_panel.addWidget(self._piece_list)
 
         # Piece count label
@@ -432,8 +522,9 @@ class PieceTab(QWidget):
         selected_items = self._piece_list.selectedItems()
         if selected_items:
             index = self._piece_list.row(selected_items[0])
-            if 0 <= index < len(self._pieces):
-                self._selected_piece = self._pieces[index]
+            pieces_list = list(self._pieces.keys())
+            if 0 <= index < len(pieces_list):
+                self._selected_piece = pieces_list[index]
                 # Load the piece shape into the grid
                 shape = self._selected_piece.shape
                 self._grid_widget.filled_cells = shape.copy()
@@ -445,28 +536,196 @@ class PieceTab(QWidget):
 
         self.piece_selected.emit(self._selected_piece)
 
+    def _on_piece_item_clicked(self, item: QListWidgetItem) -> None:
+        """Handle clicking on a piece list item.
+
+        This ensures selection is properly handled when clicking on
+        the custom widget area.
+        """
+        # Just trigger the selection changed handler to ensure consistency
+        self._on_piece_selection_changed()
+
     def _on_add_piece(self) -> None:
         """Handle adding a new piece."""
-        self._piece_counter += 1
-        piece_name = f"Piece {self._piece_counter}"
-
         # Create new piece from current grid
         shape = self._grid_widget.filled_cells
         if not shape:
             # Create empty piece - user will draw it
             shape = {(0, 0)}
 
-        piece = PuzzlePiece(name=piece_name, shape=shape)
-        self._pieces.append(piece)
+        new_piece = PuzzlePiece(shape=shape)
 
-        # Add to list
-        item = QListWidgetItem(piece_name)
-        item.setData(Qt.ItemDataRole.UserRole, piece)
-        self._piece_list.addItem(item)
-        self._piece_list.setCurrentRow(len(self._pieces) - 1)
+        # Check if this shape already exists (uses canonical shape comparison)
+        if new_piece in self._pieces:
+            # Increment count for existing piece
+            self._pieces[new_piece] += 1
+        else:
+            # Add new piece with count 1
+            self._pieces[new_piece] = 1
 
-        self._piece_count_label.setText(f"Pieces: {len(self._pieces)}")
-        self.piece_added.emit(piece)
+        # Refresh list with custom widgets
+        self._refresh_piece_list()
+        self._select_piece_in_list(new_piece)
+        self._piece_count_label.setText(f"Pieces: {len(self._get_all_pieces())}")
+        self.piece_added.emit(new_piece)
+
+    def _get_piece_label(self, piece: PuzzlePiece) -> str:
+        """Generate a descriptive label for a piece.
+
+        Args:
+            piece: The piece to label
+
+        Returns:
+            A descriptive label showing shape info and count
+        """
+        cell_count = len(piece.shape)
+        count = self._pieces.get(piece, 1)
+
+        # Try to identify the shape type
+        shape_type = self._identify_shape_type(piece)
+
+        if count > 1:
+            return f"{shape_type} ({cell_count} cells) ×{count}"
+        return f"{shape_type} ({cell_count} cells)"
+
+    def _identify_shape_type(self, piece: PuzzlePiece) -> str:
+        """Identify the type of polyomino shape.
+
+        Args:
+            piece: The piece to identify
+
+        Returns:
+            A string describing the shape type
+        """
+        shape = piece.shape
+        area = len(shape)
+
+        # Get bounding box dimensions
+        min_row = min(r for r, c in shape)
+        max_row = max(r for r, c in shape)
+        min_col = min(c for r, c in shape)
+        max_col = max(c for r, c in shape)
+        width = max_col - min_col + 1
+        height = max_row - min_row + 1
+
+        # Special shape patterns
+        if area == 1:
+            return "Mono"
+        elif area == 2:
+            return "Domino"
+        elif area == 3:
+            # L-shape or straight
+            if width == 1 or height == 1:
+                return "Triomino (straight)"
+            else:
+                return "Triomino (L)"
+        elif area == 4:
+            # Check for common tetromino types
+            # Straight (I)
+            if width == 4 or height == 4:
+                return "Tetromino (I)"
+            # Square (O)
+            elif width == 2 and height == 2:
+                return "Tetromino (O)"
+            # L-shape
+            elif (width == 3 and height == 2) or (width == 2 and height == 3):
+                return "Tetromino (L)"
+            # T-shape
+            elif width == 3 and height == 2:
+                # Check if it's a T
+                return "Tetromino (T)"
+            # S or Z shape
+            elif width == 3 and height == 2:
+                return "Tetromino (S)"
+            else:
+                return "Tetromino"
+        else:
+            # For larger pieces, use dimensions
+            if width == 1:
+                return f"Bar ({area})"
+            elif height == 1:
+                return f"Bar ({area})"
+            elif width == height:
+                return f"Square ({area})"
+            else:
+                return f"Polyomino ({width}×{height})"
+
+    def _get_piece_index(self, piece: PuzzlePiece) -> int:
+        """Get the index of a piece in the internal list.
+
+        Args:
+            piece: The piece to find
+
+        Returns:
+            The index in the pieces list, or -1 if not found
+        """
+        pieces_list = list(self._pieces.keys())
+        try:
+            return pieces_list.index(piece)
+        except ValueError:
+            return -1
+
+    def _get_all_pieces(self) -> list[PuzzlePiece]:
+        """Get a flat list of all pieces with counts expanded.
+
+        Returns:
+            List of pieces with each piece repeated according to its count
+        """
+        all_pieces = []
+        for piece, count in self._pieces.items():
+            all_pieces.extend([piece] * count)
+        return all_pieces
+
+    def _refresh_piece_list(self) -> None:
+        """Refresh all list items with custom widgets showing counts."""
+        self._piece_list.clear()
+        for piece, count in self._pieces.items():
+            item = QListWidgetItem()
+            item.setData(Qt.ItemDataRole.UserRole, piece)
+
+            widget = PieceListItemWidget(piece, count)
+            widget.increment_requested.connect(self._on_piece_increment)
+            widget.decrement_requested.connect(self._on_piece_decrement)
+
+            self._piece_list.addItem(item)
+            self._piece_list.setItemWidget(item, widget)
+
+    def _on_piece_increment(self, piece: PuzzlePiece) -> None:
+        """Handle increment button click for a piece."""
+        if piece in self._pieces:
+            self._pieces[piece] += 1
+            self._refresh_piece_list()
+            # Re-select the piece
+            self._select_piece_in_list(piece)
+            self._piece_count_label.setText(f"Pieces: {len(self._get_all_pieces())}")
+
+    def _on_piece_decrement(self, piece: PuzzlePiece) -> None:
+        """Handle decrement button click for a piece."""
+        if piece not in self._pieces:
+            return
+
+        if self._pieces[piece] > 1:
+            self._pieces[piece] -= 1
+            self._refresh_piece_list()
+            # Re-select the piece
+            self._select_piece_in_list(piece)
+        else:
+            # Remove entirely when count reaches 0
+            del self._pieces[piece]
+            self._selected_piece = None
+            self._grid_widget.clear()
+            self._refresh_piece_list()
+
+        self._piece_count_label.setText(f"Pieces: {len(self._get_all_pieces())}")
+
+    def _select_piece_in_list(self, piece: PuzzlePiece) -> None:
+        """Select a piece in the list widget."""
+        pieces_list = list(self._pieces.keys())
+        try:
+            index = pieces_list.index(piece)
+            self._piece_list.setCurrentRow(index)
+        except ValueError:
+            pass
 
     def _on_delete_piece(self) -> None:
         """Handle deleting the selected piece."""
@@ -474,22 +733,22 @@ class PieceTab(QWidget):
             return
 
         piece_to_delete = self._selected_piece
-        index = self._pieces.index(piece_to_delete)
 
-        # Remove from list
-        self._pieces.pop(index)
-        self._piece_list.takeItem(index)
+        # Decrement count or remove if only 1
+        if piece_to_delete in self._pieces:
+            if self._pieces[piece_to_delete] > 1:
+                self._pieces[piece_to_delete] -= 1
+            else:
+                # Remove entirely
+                del self._pieces[piece_to_delete]
 
         # Clear selection and grid
         self._selected_piece = None
         self._grid_widget.clear()
 
-        # Select next piece or clear
-        if self._pieces:
-            new_index = min(index, len(self._pieces) - 1)
-            self._piece_list.setCurrentRow(new_index)
-        else:
-            self._piece_count_label.setText("Pieces: 0")
+        # Refresh list and update count
+        self._refresh_piece_list()
+        self._piece_count_label.setText(f"Pieces: {len(self._get_all_pieces())}")
 
         self.piece_deleted.emit(piece_to_delete)
 
@@ -498,13 +757,18 @@ class PieceTab(QWidget):
         self._grid_widget.clear()
         self._update_shape_info()
 
-        # Update selected piece if any
+        # Update selected piece if any - just clear its cells
         if self._selected_piece:
-            # Create updated piece
-            new_piece = PuzzlePiece(name=self._selected_piece.name, shape=set())
-            index = self._pieces.index(self._selected_piece)
-            self._pieces[index] = new_piece
+            # Update the shape in place (since PuzzlePiece is immutable, we need to replace)
+            # Get current count
+            count = self._pieces.get(self._selected_piece, 1)
+            # Create new piece with empty shape (will be validated elsewhere)
+            new_piece = PuzzlePiece(shape={(0, 0)})
+            # Replace in dict - remove old, add new
+            del self._pieces[self._selected_piece]
+            self._pieces[new_piece] = count
             self._selected_piece = new_piece
+            self._refresh_piece_list()
             self.piece_modified.emit(new_piece)
 
     def _on_grid_size_changed(self) -> None:
@@ -520,8 +784,8 @@ class PieceTab(QWidget):
 
     @property
     def pieces(self) -> list[PuzzlePiece]:
-        """Get the list of all pieces."""
-        return self._pieces.copy()
+        """Get the list of all pieces with counts expanded."""
+        return self._get_all_pieces()
 
     @property
     def selected_piece(self) -> PuzzlePiece | None:
@@ -540,10 +804,14 @@ class PieceTab(QWidget):
         """Save the current grid shape to the selected piece."""
         if self._selected_piece is not None:
             shape = self._grid_widget.filled_cells
-            index = self._pieces.index(self._selected_piece)
-            new_piece = PuzzlePiece(name=self._selected_piece.name, shape=shape)
-            self._pieces[index] = new_piece
+            # Get current count
+            count = self._pieces.get(self._selected_piece, 1)
+            new_piece = PuzzlePiece(shape=shape)
+            # Replace in dict
+            del self._pieces[self._selected_piece]
+            self._pieces[new_piece] = count
             self._selected_piece = new_piece
+            self._refresh_piece_list()
             self.piece_modified.emit(new_piece)
 
     def add_piece(self, piece: PuzzlePiece) -> None:
@@ -552,21 +820,18 @@ class PieceTab(QWidget):
         Args:
             piece: The piece to add
         """
-        self._pieces.append(piece)
+        # Check if this shape already exists
+        if piece in self._pieces:
+            self._pieces[piece] += 1
+        else:
+            self._pieces[piece] = 1
 
-        # Update counter if this is an auto-named piece
-        if piece.name.startswith("Piece "):
-            try:
-                num = int(piece.name.split()[-1])
-                self._piece_counter = max(self._piece_counter, num)
-            except ValueError:
-                pass
-
-        # Add to list
-        item = QListWidgetItem(piece.name)
+        # Add to list with shape info
+        piece_label = self._get_piece_label(piece)
+        item = QListWidgetItem(piece_label)
         item.setData(Qt.ItemDataRole.UserRole, piece)
         self._piece_list.addItem(item)
-        self._piece_count_label.setText(f"Pieces: {len(self._pieces)}")
+        self._piece_count_label.setText(f"Pieces: {len(self._get_all_pieces())}")
 
     def clear_all(self) -> None:
         """Clear all pieces and reset the UI."""

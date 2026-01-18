@@ -6,21 +6,23 @@ from src.logic.validator import is_contiguous
 
 
 class PuzzlePiece:
-    """Represents a single polyomino piece with its shape and unique identifier.
+    """Represents a single polyomino piece with its shape.
 
     Color is generated dynamically during visualization and not stored with the piece.
+    Pieces are identified by their shape for dictionary storage.
 
     Attributes:
-        name: Unique identifier for the piece shape
         shape: Set of (row, col) coordinates defining the piece shape
         precomputed_orientations: Precomputed unique orientations (8 max)
     """
 
-    def __init__(self, name: str, shape: set[tuple[int, int]]) -> None:
+    # Optional internal ID for tracking (not persisted)
+    _id: str | None = None
+
+    def __init__(self, shape: set[tuple[int, int]]) -> None:
         """Initialize a puzzle piece.
 
         Args:
-            name: Unique identifier for the piece shape
             shape: Set of (row, col) coordinates defining the piece shape
 
         Raises:
@@ -31,10 +33,44 @@ class PuzzlePiece:
         if not is_contiguous(shape):
             raise ValueError("Shape must be contiguous (all cells connected)")
 
-        self._name = name
         self._shape = shape
+        # Compute canonical shape for equality (rotated/flipped = equal)
+        self._canonical_shape = self._compute_canonical_shape()
         # Precompute all 8 orientations (4 rotations × 2 mirrors) for performance
         self._precomputed_orientations = self._compute_all_orientations()
+
+    def _compute_canonical_shape(self) -> frozenset[tuple[int, int]]:
+        """Compute canonical representation (smallest normalized orientation).
+
+        Two pieces are equal if they have the same shape regardless of
+        position, rotation, or flip. This method finds the canonical
+        representation by comparing all 8 orientations.
+
+        Returns:
+            frozenset of coordinates representing the canonical shape
+        """
+        orientations: set[frozenset[tuple[int, int]]] = set()
+
+        # Generate all unique orientations using existing helper methods
+        for flip_axis in [None, "horizontal", "vertical"]:
+            if flip_axis is None:
+                base = self._shape
+            else:
+                base = self._flip_shape(self._shape, flip_axis)
+
+            for degrees in (0, 90, 180, 270):
+                rotated = self._rotate_shape(base, degrees)
+                normalized = self._normalize_shape(rotated)
+                orientations.add(frozenset(normalized))
+
+        # Return smallest as canonical (lexicographically)
+        return min(orientations)
+
+    def _normalize_shape(self, shape: set[tuple[int, int]]) -> set[tuple[int, int]]:
+        """Shift shape so min row/col = 0."""
+        min_row = min(r for r, c in shape)
+        min_col = min(c for r, c in shape)
+        return {(r - min_row, c - min_col) for r, c in shape}
 
     @classmethod
     def with_id(cls, shape: set[tuple[int, int]], id: str) -> "PuzzlePiece":
@@ -47,24 +83,21 @@ class PuzzlePiece:
         Returns:
             PuzzlePiece instance
         """
-        piece = cls(id, shape)
+        piece = cls(shape)
+        piece._id = id
         return piece
 
     @classmethod
-    def _create_without_precompute(
-        cls, name: str, shape: set[tuple[int, int]]
-    ) -> "PuzzlePiece":
+    def _create_without_precompute(cls, shape: set[tuple[int, int]]) -> "PuzzlePiece":
         """Create a PuzzlePiece without triggering precomputation (for internal use).
 
         Args:
-            name: Unique identifier for the piece
             shape: Set of (row, col) coordinates defining the piece shape
 
         Returns:
             New PuzzlePiece instance without precomputed orientations
         """
         piece = object.__new__(cls)
-        piece._name = name
         piece._shape = shape
         # Skip precomputation to avoid infinite recursion
         piece._precomputed_orientations = []
@@ -84,7 +117,6 @@ class PuzzlePiece:
             # Add original (not flipped) rotation (skip precomputation for these)
             orientations.append(
                 PuzzlePiece._create_without_precompute(
-                    f"{self._name}-rot{i * 90}",
                     current_shape.copy(),
                 )
             )
@@ -92,7 +124,6 @@ class PuzzlePiece:
             flipped_shape = self._flip_shape(current_shape, "horizontal")
             orientations.append(
                 PuzzlePiece._create_without_precompute(
-                    f"{self._name}-rot{i * 90}fh",
                     flipped_shape,
                 )
             )
@@ -168,11 +199,6 @@ class PuzzlePiece:
         return self._precomputed_orientations
 
     @property
-    def name(self) -> str:
-        """Get the piece name."""
-        return self._name
-
-    @property
     def shape(self) -> set[tuple[int, int]]:
         """Get the piece shape coordinates."""
         return self._shape.copy()
@@ -224,7 +250,6 @@ class PuzzlePiece:
         normalized_shape = {(row - min_row, col - min_col) for row, col in new_shape}
 
         return PuzzlePiece(
-            name=f"{self._name}-rot{degrees}",
             shape=normalized_shape,
         )
 
@@ -253,7 +278,6 @@ class PuzzlePiece:
         normalized_shape = {(row - min_row, col - min_col) for row, col in new_shape}
 
         return PuzzlePiece(
-            name=f"{self._name}-flip{axis[0]}",
             shape=normalized_shape,
         )
 
@@ -338,20 +362,26 @@ class PuzzlePiece:
     def _create_copy(self) -> PuzzlePiece:
         """Create a copy of this piece with the same attributes."""
         return PuzzlePiece(
-            name=self._name,
             shape=self._shape.copy(),
         )
 
     def __eq__(self, other: object) -> bool:
-        """Check equality with another piece."""
+        """Check equality with another piece.
+
+        Two pieces are equal if they have the same shape regardless of
+        position, rotation, or flip.
+        """
         if not isinstance(other, PuzzlePiece):
             return NotImplemented
-        return self._name == other._name and self._shape == other._shape
+        return self._canonical_shape == other._canonical_shape
 
     def __hash__(self) -> int:
-        """Make piece hashable for use in sets and dicts."""
-        return hash((self._name, frozenset(self._shape)))
+        """Make piece hashable for use in sets and dicts.
+
+        Uses canonical shape so rotated/flipped versions hash the same.
+        """
+        return hash(self._canonical_shape)
 
     def __repr__(self) -> str:
         """Get string representation."""
-        return f"PuzzlePiece(name='{self._name}', shape={self._shape})"
+        return f"PuzzlePiece(shape={self._shape})"

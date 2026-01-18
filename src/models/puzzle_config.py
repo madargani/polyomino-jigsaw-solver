@@ -148,18 +148,18 @@ class PuzzleConfiguration:
         return all_pieces
 
     def get_piece_counts(self) -> dict[str, int]:
-        """Get mapping of piece names to their counts.
+        """Get mapping of piece shape representations to their counts.
 
         Returns:
-            Dictionary of piece_name -> count
+            Dictionary of piece shape string -> count
         """
-        return {piece.name: count for piece, count in self._pieces.items()}
+        return {str(piece.shape): count for piece, count in self._pieces.items()}
 
     def update_piece(self, piece: PuzzlePiece, count: int = 1) -> None:
         """Update an existing piece in the configuration.
 
         Args:
-            piece: Updated PuzzlePiece with same name
+            piece: Updated PuzzlePiece with same shape
             count: Number of copies of this piece
 
         Raises:
@@ -168,10 +168,10 @@ class PuzzleConfiguration:
         # Validate new shape
         shape_errors = validate_piece_shape(piece.shape)
         if shape_errors:
-            raise ValueError(f"Piece {piece.name}: {shape_errors[0].message}")
+            raise ValueError(f"Piece: {shape_errors[0].message}")
 
         if piece not in self._pieces:
-            raise ValueError(f"Piece with name '{piece.name}' not found")
+            raise ValueError("Piece not found")
 
         self._pieces[piece] = count
         self._modified_at = datetime.utcnow()
@@ -189,21 +189,16 @@ class PuzzleConfiguration:
         """
         errors: list[str] = []
 
-        # Check piece names are unique
-        piece_names = [piece.name for piece in self._pieces]
-        if len(piece_names) != len(set(piece_names)):
-            errors.append("Piece names must be unique")
-
         # Check piece counts are positive
         for piece, count in self._pieces.items():
             if count <= 0:
-                errors.append(f"Piece '{piece.name}' has invalid count {count}")
+                errors.append(f"Piece has invalid count {count}")
 
         # Check piece contiguity using centralized validator
         for piece in self._pieces:
             shape_errors = validate_piece_shape(piece.shape)
             for error in shape_errors:
-                errors.append(f"Piece {piece.name}: {error.message}")
+                errors.append(f"Piece: {error.message}")
 
         # Check total piece area vs available board area
         piece_area = self.get_total_piece_area()
@@ -229,14 +224,14 @@ class PuzzleConfiguration:
             count: Number of copies to add (default: 1)
 
         Raises:
-            ValueError: If piece is invalid or duplicate name
+            ValueError: If piece is invalid
         """
         # Use centralized validation
         shape_errors = validate_piece_shape(piece.shape)
         if shape_errors:
-            raise ValueError(f"Piece {piece.name}: {shape_errors[0].message}")
+            raise ValueError(f"Piece: {shape_errors[0].message}")
 
-        # Check for duplicate name
+        # Check for duplicate shape
         if piece in self._pieces:
             self._pieces[piece] += count
         else:
@@ -255,11 +250,11 @@ class PuzzleConfiguration:
             ValueError: If piece not found or count exceeds available
         """
         if piece not in self._pieces:
-            raise ValueError(f"Piece with name '{piece.name}' not found")
+            raise ValueError("Piece not found")
 
         if self._pieces[piece] < count:
             raise ValueError(
-                f"Cannot remove {count} of piece '{piece.name}', only {self._pieces[piece]} available"
+                f"Cannot remove {count} of this piece, only {self._pieces[piece]} available"
             )
 
         self._pieces[piece] -= count
@@ -267,20 +262,6 @@ class PuzzleConfiguration:
             del self._pieces[piece]
 
         self._modified_at = datetime.utcnow()
-
-    def get_piece_by_name(self, name: str) -> PuzzlePiece | None:
-        """Get a piece by its name.
-
-        Args:
-            name: Name of the piece to find
-
-        Returns:
-            PuzzlePiece if found, None otherwise
-        """
-        for piece in self._pieces:
-            if piece.name == name:
-                return piece
-        return None
 
     def get_board(self) -> GameBoard:
         """Create a GameBoard from configuration.
@@ -330,7 +311,7 @@ class PuzzleConfiguration:
             "board_height": self._board_height,
             "blocked_cells": [[row, col] for row, col in self._blocked_cells],
             "pieces": [
-                {"name": piece.name, "shape": list(piece.shape), "count": count}
+                {"shape": list(piece.shape), "count": count}
                 for piece, count in self._pieces.items()
             ],
             "created_at": self._created_at.isoformat(),
@@ -357,11 +338,11 @@ class PuzzleConfiguration:
 
         pieces_dict: dict[PuzzlePiece, int] = {}
         for piece_data in data["pieces"]:
-            if "name" not in piece_data or "shape" not in piece_data:
-                raise ValueError("Invalid piece data: missing name or shape")
+            if "shape" not in piece_data:
+                raise ValueError("Invalid piece data: missing shape")
 
             shape = set((row, col) for row, col in piece_data["shape"])
-            piece = PuzzlePiece(name=piece_data["name"], shape=shape)
+            piece = PuzzlePiece(shape=shape)
             count = piece_data.get(
                 "count", 1
             )  # Default to 1 for backward compatibility
@@ -402,7 +383,7 @@ class PuzzleConfiguration:
             New PuzzleConfiguration with identical state (including blocked cells)
         """
         pieces_copy = {
-            PuzzlePiece(name=p.name, shape=p.shape.copy()): count
+            PuzzlePiece(shape=p.shape.copy()): count
             for p, count in self._pieces.items()
         }
         new_config = PuzzleConfiguration(
@@ -428,10 +409,10 @@ class PuzzleConfiguration:
             and self._blocked_cells == other._blocked_cells
             and len(self._pieces) == len(other._pieces)
             and all(
-                p1.name == p2.name and c1 == c2
+                p1.shape == p2.shape and c1 == c2
                 for (p1, c1), (p2, c2) in zip(
-                    sorted(self._pieces.items(), key=lambda x: x[0].name),
-                    sorted(other._pieces.items(), key=lambda x: x[0].name),
+                    sorted(self._pieces.items(), key=lambda x: str(x[0].shape)),
+                    sorted(other._pieces.items(), key=lambda x: str(x[0].shape)),
                 )
             )
         )

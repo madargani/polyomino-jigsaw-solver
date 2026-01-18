@@ -18,7 +18,7 @@ class TestSaveLoadRoundtrip:
         """Test saving and loading preserves simple puzzle configuration."""
         from src.utils.file_io import save_puzzle, load_puzzle
 
-        piece = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1), (1, 2)})
         original_config = PuzzleConfiguration(
             name="Simple Puzzle",
             board_width=4,
@@ -41,7 +41,6 @@ class TestSaveLoadRoundtrip:
             loaded_piece = list(loaded_config.pieces.keys())[0]
             original_piece = list(original_config.pieces.keys())[0]
 
-            assert loaded_piece.name == original_piece.name
             assert loaded_piece.shape == original_piece.shape
             assert (
                 loaded_config.pieces[loaded_piece]
@@ -55,9 +54,9 @@ class TestSaveLoadRoundtrip:
         """Test saving and loading preserves complex puzzle configuration."""
         from src.utils.file_io import save_puzzle, load_puzzle
 
-        piece1 = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
-        piece2 = PuzzlePiece(name="T-tetromino", shape={(0, 0), (0, 1), (0, 2), (1, 1)})
-        piece3 = PuzzlePiece(name="I-tetromino", shape={(0, 0), (0, 1), (0, 2), (0, 3)})
+        piece1 = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+        piece2 = PuzzlePiece(shape={(0, 0), (0, 1), (0, 2), (1, 1)})
+        piece3 = PuzzlePiece(shape={(0, 0), (0, 1), (0, 2), (0, 3)})
         blocked_cells = {(0, 0), (2, 2), (3, 3)}
         original_config = PuzzleConfiguration(
             name="Complex Puzzle",
@@ -80,8 +79,10 @@ class TestSaveLoadRoundtrip:
             assert loaded_config.blocked_cells == original_config.blocked_cells
             assert len(loaded_config.pieces) == len(original_config.pieces)
 
-            for piece_name, count in loaded_config.get_piece_counts().items():
-                assert original_config.get_piece_counts().get(piece_name) == count
+            # Compare piece counts (compare total counts match)
+            original_counts = list(original_config.get_piece_counts().values())
+            loaded_counts = list(loaded_config.get_piece_counts().values())
+            assert sorted(original_counts) == sorted(loaded_counts)
         finally:
             if filepath.exists():
                 filepath.unlink()
@@ -90,9 +91,7 @@ class TestSaveLoadRoundtrip:
         """Test saving and loading preserves piece shapes exactly."""
         from src.utils.file_io import save_puzzle, load_puzzle
 
-        piece = PuzzlePiece(
-            name="Custom Shape", shape={(0, 0), (1, 0), (1, 1), (2, 1), (2, 2)}
-        )
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1), (2, 1), (2, 2)})
         original_config = PuzzleConfiguration(
             name="Shape Test",
             board_width=6,
@@ -121,7 +120,7 @@ class TestSaveLoadRoundtrip:
         """Test loaded configuration passes validation."""
         from src.utils.file_io import save_puzzle, load_puzzle
 
-        piece = PuzzlePiece(name="Valid Piece", shape={(0, 0), (0, 1)})
+        piece = PuzzlePiece(shape={(0, 0), (0, 1)})
         original_config = PuzzleConfiguration(
             name="Valid Puzzle",
             board_width=2,
@@ -153,7 +152,7 @@ class TestExportImportRoundtrip:
         """Test exporting and importing preserves puzzle configuration."""
         from src.utils.file_io import export_puzzle, import_puzzle
 
-        piece = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1), (1, 2)})
         original_config = PuzzleConfiguration(
             name="Export Test",
             board_width=4,
@@ -179,10 +178,8 @@ class TestExportImportRoundtrip:
         """Test exporting and importing multiple piece types."""
         from src.utils.file_io import export_puzzle, import_puzzle
 
-        piece1 = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
-        piece2 = PuzzlePiece(
-            name="Square-tetromino", shape={(0, 0), (0, 1), (1, 0), (1, 1)}
-        )
+        piece1 = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+        piece2 = PuzzlePiece(shape={(0, 0), (0, 1), (1, 0), (1, 1)})
         original_config = PuzzleConfiguration(
             name="Multi Export Test",
             board_width=5,
@@ -207,7 +204,7 @@ class TestExportImportRoundtrip:
         """Test exporting and importing preserves piece properties."""
         from src.utils.file_io import export_puzzle, import_puzzle
 
-        piece = PuzzlePiece(name="T-tetromino", shape={(0, 0), (0, 1), (0, 2), (1, 1)})
+        piece = PuzzlePiece(shape={(0, 0), (0, 1), (0, 2), (1, 1)})
         original_config = PuzzleConfiguration(
             name="Property Test",
             board_width=4,
@@ -225,7 +222,7 @@ class TestExportImportRoundtrip:
             imported_piece = list(imported_config.pieces.keys())[0]
             original_piece = list(original_config.pieces.keys())[0]
 
-            assert imported_piece.name == original_piece.name
+            assert imported_piece.shape == original_piece.shape
             assert imported_piece.area == original_piece.area
             assert imported_piece.width == original_piece.width
             assert imported_piece.height == original_piece.height

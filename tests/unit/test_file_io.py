@@ -20,7 +20,7 @@ class TestSavePuzzle:
         """Test saving creates a JSON file with valid structure."""
         from src.utils.file_io import save_puzzle
 
-        piece = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1), (1, 2)})
         config = PuzzleConfiguration(
             name="Test Puzzle",
             board_width=4,
@@ -46,43 +46,15 @@ class TestSavePuzzle:
             assert "board_height" in data
             assert data["board_height"] == 4
             assert "pieces" in data
-            assert len(data["pieces"]) == 1
-            assert data["pieces"][0]["name"] == "L-tetromino"
-        finally:
-            if filepath.exists():
-                filepath.unlink()
+            piece_shapes = [p["shape"] for p in data["pieces"]]
+            assert len(piece_shapes) == 1
+            # Verify no 'name' field in pieces
+            for p in data["pieces"]:
+                assert "name" not in p
 
-    def test_save_puzzle_with_multiple_pieces(self) -> None:
-        """Test saving configuration with multiple pieces."""
-        from src.utils.file_io import save_puzzle
-
-        piece1 = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
-        piece2 = PuzzlePiece(name="T-tetromino", shape={(0, 0), (0, 1), (0, 2), (1, 1)})
-        config = PuzzleConfiguration(
-            name="Multi Piece Puzzle",
-            board_width=5,
-            board_height=5,
-            pieces={piece1: 2, piece2: 1},
-        )
-
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as f:
-            filepath = Path(f.name)
-
-        try:
-            save_puzzle(config, filepath)
-
-            with filepath.open("r") as f:
-                data = json.load(f)
-
-            assert len(data["pieces"]) == 2
-            piece_names = [p["name"] for p in data["pieces"]]
-            assert "L-tetromino" in piece_names
-            assert "T-tetromino" in piece_names
-
-            l_piece = next(p for p in data["pieces"] if p["name"] == "L-tetromino")
-            assert l_piece["count"] == 2
-            t_piece = next(p for p in data["pieces"] if p["name"] == "T-tetromino")
-            assert t_piece["count"] == 1
+            # Check counts
+            counts = sorted([p["count"] for p in data["pieces"]])
+            assert counts == [1]
         finally:
             if filepath.exists():
                 filepath.unlink()
@@ -91,7 +63,7 @@ class TestSavePuzzle:
         """Test saving configuration with blocked cells."""
         from src.utils.file_io import save_puzzle
 
-        piece = PuzzlePiece(name="Domino", shape={(0, 0), (0, 1)})
+        piece = PuzzlePiece(shape={(0, 0), (0, 1)})
         blocked_cells = {(0, 0), (1, 1)}
         config = PuzzleConfiguration(
             name="Blocked Cells Puzzle",
@@ -123,7 +95,7 @@ class TestSavePuzzle:
         from src.utils.file_io import save_puzzle
         from datetime import datetime
 
-        piece = PuzzlePiece(name="Monomino", shape={(0, 0)})
+        piece = PuzzlePiece(shape={(0, 0)})
         config = PuzzleConfiguration(
             name="Timestamp Puzzle",
             board_width=2,
@@ -159,7 +131,7 @@ class TestLoadPuzzle:
         """Test loading a puzzle from a valid JSON file."""
         from src.utils.file_io import save_puzzle, load_puzzle
 
-        piece = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1), (1, 2)})
         original_config = PuzzleConfiguration(
             name="Test Puzzle",
             board_width=4,
@@ -179,7 +151,8 @@ class TestLoadPuzzle:
             assert loaded_config.board_width == 4
             assert loaded_config.board_height == 4
             assert len(loaded_config.pieces) == 1
-            assert list(loaded_config.pieces.keys())[0].name == "L-tetromino"
+            loaded_piece = list(loaded_config.pieces.keys())[0]
+            assert loaded_piece.shape == {(0, 0), (1, 0), (1, 1), (1, 2)}
         finally:
             if filepath.exists():
                 filepath.unlink()
@@ -188,8 +161,8 @@ class TestLoadPuzzle:
         """Test loading preserves piece counts."""
         from src.utils.file_io import save_puzzle, load_puzzle
 
-        piece1 = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
-        piece2 = PuzzlePiece(name="T-tetromino", shape={(0, 0), (0, 1), (0, 2), (1, 1)})
+        piece1 = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+        piece2 = PuzzlePiece(shape={(0, 0), (0, 1), (0, 2), (1, 1)})
         original_config = PuzzleConfiguration(
             name="Count Test",
             board_width=5,
@@ -207,9 +180,9 @@ class TestLoadPuzzle:
 
             assert len(loaded_config.pieces) == 2
             for piece, count in loaded_config.pieces.items():
-                if piece.name == "L-tetromino":
+                if piece.shape == {(0, 0), (1, 0), (1, 1), (1, 2)}:
                     assert count == 2
-                elif piece.name == "T-tetromino":
+                elif piece.shape == {(0, 0), (0, 1), (0, 2), (1, 1)}:
                     assert count == 3
         finally:
             if filepath.exists():
@@ -219,7 +192,7 @@ class TestLoadPuzzle:
         """Test loading restores blocked cells."""
         from src.utils.file_io import save_puzzle, load_puzzle
 
-        piece = PuzzlePiece(name="Domino", shape={(0, 0), (0, 1)})
+        piece = PuzzlePiece(shape={(0, 0), (0, 1)})
         blocked_cells = {(0, 0), (1, 1)}
         original_config = PuzzleConfiguration(
             name="Blocked Cells Test",
@@ -287,7 +260,7 @@ class TestExportPuzzle:
         """Test exporting creates a JSON file."""
         from src.utils.file_io import export_puzzle
 
-        piece = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1), (1, 2)})
         config = PuzzleConfiguration(
             name="Export Test",
             board_width=4,
@@ -316,7 +289,7 @@ class TestExportPuzzle:
         """Test that export produces same format as save."""
         from src.utils.file_io import save_puzzle, export_puzzle
 
-        piece = PuzzlePiece(name="T-tetromino", shape={(0, 0), (0, 1), (0, 2), (1, 1)})
+        piece = PuzzlePiece(shape={(0, 0), (0, 1), (0, 2), (1, 1)})
         config = PuzzleConfiguration(
             name="Format Test",
             board_width=5,
@@ -353,7 +326,7 @@ class TestImportPuzzle:
         """Test importing a puzzle from a valid JSON file."""
         from src.utils.file_io import export_puzzle, import_puzzle
 
-        piece = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1), (1, 2)})
         original_config = PuzzleConfiguration(
             name="Import Test",
             board_width=4,
@@ -380,7 +353,7 @@ class TestImportPuzzle:
         """Test that import produces same result as load."""
         from src.utils.file_io import save_puzzle, load_puzzle, import_puzzle
 
-        piece = PuzzlePiece(name="T-tetromino", shape={(0, 0), (0, 1), (0, 2), (1, 1)})
+        piece = PuzzlePiece(shape={(0, 0), (0, 1), (0, 2), (1, 1)})
         config = PuzzleConfiguration(
             name="Comparison Test",
             board_width=5,

@@ -73,10 +73,10 @@ class PuzzleState:
         """
         # Check if we have any of this piece remaining
         if self._remaining_pieces.get(piece, 0) <= 0:
-            raise ValueError(f"No more pieces of type '{piece.name}' remaining")
+            raise ValueError("No more pieces of this shape remaining")
 
         if not self._board.can_place_piece(piece, position):
-            raise ValueError(f"Cannot place piece {piece.name} at position {position}")
+            raise ValueError(f"Cannot place piece at position {position}")
 
         # Place the piece on the board
         self._board.place_piece(piece, position)
@@ -90,7 +90,7 @@ class PuzzleState:
             del self._remaining_pieces[piece]
 
         # Record operation
-        self.record_operation("place", piece.name, position, piece)
+        self.record_operation("place", str(piece.shape), position, piece)
 
         return True
 
@@ -113,7 +113,7 @@ class PuzzleState:
                 # Increment remaining count
                 self._remaining_pieces[piece] = self._remaining_pieces.get(piece, 0) + 1
                 # Record operation
-                self.record_operation("remove", piece.name, position)
+                self.record_operation("remove", str(piece.shape), position)
                 return piece
         return None
 

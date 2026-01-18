@@ -126,12 +126,12 @@ class TestGameBoardCellAccess:
         assert board.get_piece_at((2, 2)) is None
 
     def test_get_piece_at_returns_none_for_blocked_cell(self) -> None:
-        """Test that get_piece_at returns __BLOCKED__ for blocked cells."""
+        """Test that get_piece_at returns -1 for blocked cells."""
         board = GameBoard(width=3, height=3, blocked_cells={(1, 1)})
 
-        # Blocked cells return '__BLOCKED__' (not None)
+        # Blocked cells return -1 (not None)
         result = board.get_piece_at((1, 1))
-        assert result == "__BLOCKED__"
+        assert result == -1
 
 
 class TestGameBoardPiecePlacement:
@@ -140,7 +140,7 @@ class TestGameBoardPiecePlacement:
     def test_can_place_piece_returns_true_for_valid_placement(self) -> None:
         """Test can_place_piece returns True for valid placement."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1)})
 
         assert board.can_place_piece(piece, (0, 0)) is True
         assert board.can_place_piece(piece, (3, 3)) is True
@@ -148,8 +148,8 @@ class TestGameBoardPiecePlacement:
     def test_can_place_piece_returns_false_for_overlap(self) -> None:
         """Test can_place_piece returns False if piece overlaps existing."""
         board = GameBoard(width=5, height=5)
-        piece1 = PuzzlePiece(name="L1", shape={(0, 0), (1, 0)})
-        piece2 = PuzzlePiece(name="L2", shape={(0, 0), (0, 1)})
+        piece1 = PuzzlePiece(shape={(0, 0), (1, 0)})
+        piece2 = PuzzlePiece(shape={(0, 0), (0, 1)})
 
         # Place first piece
         board.place_piece(piece1, (0, 0))
@@ -160,7 +160,7 @@ class TestGameBoardPiecePlacement:
     def test_can_place_piece_returns_false_for_out_of_bounds(self) -> None:
         """Test can_place_piece returns False for out-of-bounds placement."""
         board = GameBoard(width=3, height=3)
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1)})
 
         # Piece would extend beyond board
         assert board.can_place_piece(piece, (2, 2)) is False
@@ -170,27 +170,28 @@ class TestGameBoardPiecePlacement:
         """Test can_place_piece returns False if piece hits blocked cell."""
         board = GameBoard(width=3, height=3, blocked_cells={(1, 1)})
         # Shape {(0, 0), (1, 0), (1, 1)} placed at (0,0) covers (1,1) - the blocked cell
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1)})
 
         assert board.can_place_piece(piece, (0, 0)) is False
 
     def test_place_piece_success(self) -> None:
         """Test successful piece placement."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1)})
 
         result = board.place_piece(piece, (1, 1))
         assert result is True
 
-        # Verify piece is placed
-        assert board.get_piece_at((1, 1)) == "L"
-        assert board.get_piece_at((2, 1)) == "L"
-        assert board.get_piece_at((2, 2)) == "L"
+        # Verify piece is placed (returns hash of piece shape)
+        piece_id = board.get_piece_at((1, 1))
+        assert piece_id is not None
+        assert board.get_piece_at((2, 1)) == piece_id
+        assert board.get_piece_at((2, 2)) == piece_id
 
     def test_place_piece_updates_occupied_cells(self) -> None:
         """Test that place_piece updates occupied cells."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(name="L", shape={(0, 0), (0, 1)})
+        piece = PuzzlePiece(shape={(0, 0), (0, 1)})
 
         board.place_piece(piece, (2, 2))
 
@@ -201,7 +202,7 @@ class TestGameBoardPiecePlacement:
     def test_place_piece_returns_false_for_invalid_placement(self) -> None:
         """Test that place_piece raises ValueError for invalid placement."""
         board = GameBoard(width=3, height=3)
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1)})
 
         # Out of bounds - should raise ValueError
         with pytest.raises(ValueError):
@@ -214,7 +215,7 @@ class TestGameBoardPieceRemoval:
     def test_remove_piece_success(self) -> None:
         """Test successful piece removal."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0)})
 
         board.place_piece(piece, (1, 1))
         board.remove_piece(piece, (1, 1))
@@ -229,7 +230,7 @@ class TestGameBoardPieceRemoval:
     def test_remove_nonexistent_piece_raises_error(self) -> None:
         """Test that removing non-existent piece raises ValueError."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0)})
 
         with pytest.raises(ValueError, match="not found"):
             board.remove_piece(piece, (0, 0))
@@ -237,7 +238,7 @@ class TestGameBoardPieceRemoval:
     def test_remove_piece_restores_cells(self) -> None:
         """Test that remove_piece properly restores cells."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(name="L", shape={(0, 0), (0, 1)})
+        piece = PuzzlePiece(shape={(0, 0), (0, 1)})
 
         board.place_piece(piece, (2, 2))
         board.remove_piece(piece, (2, 2))
@@ -258,7 +259,7 @@ class TestGameBoardState:
     def test_is_empty_returns_false_after_piece_placed(self) -> None:
         """Test is_empty returns False after piece placement."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(name="L", shape={(0, 0)})
+        piece = PuzzlePiece(shape={(0, 0)})
 
         board.place_piece(piece, (0, 0))
         assert board.is_empty() is False
@@ -267,7 +268,7 @@ class TestGameBoardState:
         """Test is_full returns True when board is completely filled."""
         # 2x2 board with one 2x2 piece
         board = GameBoard(width=2, height=2)
-        piece = PuzzlePiece(name="Square", shape={(0, 0), (0, 1), (1, 0), (1, 1)})
+        piece = PuzzlePiece(shape={(0, 0), (0, 1), (1, 0), (1, 1)})
 
         board.place_piece(piece, (0, 0))
         assert board.is_full() is True
@@ -275,7 +276,7 @@ class TestGameBoardState:
     def test_is_full_returns_false_when_board_not_full(self) -> None:
         """Test is_full returns False when board is not full."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(name="L", shape={(0, 0)})
+        piece = PuzzlePiece(shape={(0, 0)})
 
         board.place_piece(piece, (0, 0))
         assert board.is_full() is False
@@ -283,8 +284,8 @@ class TestGameBoardState:
     def test_clear_removes_all_pieces(self) -> None:
         """Test that clear removes all placed pieces."""
         board = GameBoard(width=5, height=5)
-        piece1 = PuzzlePiece(name="L1", shape={(0, 0)})
-        piece2 = PuzzlePiece(name="L2", shape={(0, 0)})
+        piece1 = PuzzlePiece(shape={(0, 0)})
+        piece2 = PuzzlePiece(shape={(0, 0)})
 
         board.place_piece(piece1, (0, 0))
         board.place_piece(piece2, (1, 1))
@@ -300,7 +301,7 @@ class TestGameBoardCopy:
     def test_copy_creates_independent_board(self) -> None:
         """Test that copy creates an independent board instance."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(name="L", shape={(0, 0)})
+        piece = PuzzlePiece(shape={(0, 0)})
         board.place_piece(piece, (0, 0))
 
         copied = board.copy()
@@ -310,8 +311,9 @@ class TestGameBoardCopy:
         assert copied.height == board.height
 
         # Should be independent - modifying original shouldn't affect copy
-        board.place_piece(PuzzlePiece(name="L2", shape={(0, 0)}), (1, 1))
-        assert board.get_piece_at((1, 1)) == "L2"
+        board.place_piece(PuzzlePiece(shape={(0, 0)}), (1, 1))
+        piece_id = board.get_piece_at((1, 1))
+        assert piece_id is not None
         assert copied.get_piece_at((1, 1)) is None
 
     def test_copy_preserves_blocked_cells(self) -> None:
@@ -329,8 +331,8 @@ class TestGameBoardFilledArea:
     def test_filled_area_property(self) -> None:
         """Test filled_area returns correct count."""
         board = GameBoard(width=4, height=4)
-        piece1 = PuzzlePiece(name="L1", shape={(0, 0), (0, 1)})  # 2 cells
-        piece2 = PuzzlePiece(name="L2", shape={(0, 0), (0, 1), (0, 2)})  # 3 cells
+        piece1 = PuzzlePiece(shape={(0, 0), (0, 1)})  # 2 cells
+        piece2 = PuzzlePiece(shape={(0, 0), (0, 1), (0, 2)})  # 3 cells
 
         assert board.filled_area == 0
 
@@ -347,7 +349,7 @@ class TestGameBoardFilledArea:
 
         assert board.empty_area == 16 - 1  # Total minus blocked
 
-        piece = PuzzlePiece(name="L", shape={(0, 0), (0, 1), (0, 2)})
+        piece = PuzzlePiece(shape={(0, 0), (0, 1), (0, 2)})
         board.place_piece(piece, (1, 1))
 
         # 3 cells placed, 1 blocked = 12 empty

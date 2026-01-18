@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import override
 
 from PySide6.QtCore import QEvent, QSize, Qt
-from PySide6.QtGui import QAction, QColor, QFont
+from PySide6.QtGui import QAction, QFont
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -23,7 +23,6 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QStatusBar,
     QTabWidget,
-    QToolBar,
     QVBoxLayout,
     QWidget,
 )
@@ -32,7 +31,6 @@ from src.gui.board_tab import BoardTab
 from src.gui.piece_tab import PieceTab
 from src.models.piece import PuzzlePiece
 from src.models.puzzle_config import PuzzleConfiguration
-from src.utils.color_generator import get_piece_color
 from src.utils.file_io import export_puzzle, import_puzzle, load_puzzle, save_puzzle
 
 SAVED_PUZZLES_DIR = Path.home() / ".polyomino-puzzles" / "saved"
@@ -60,12 +58,10 @@ class EditorWindow(QMainWindow):
             pieces={},
             blocked_cells=set(),
         )
-        self._piece_colors: dict[str, tuple[int, int, int]] = {}
         self._selected_piece_index: int | None = None
 
         self._setup_ui()
         self._setup_menu()
-        self._setup_toolbar()
         self._setup_status_bar()
         self._connect_signals()
         self._refresh_saved_puzzles_list()
@@ -94,36 +90,10 @@ class EditorWindow(QMainWindow):
         self._tab_widget.addTab(self._board_tab, "Board")
         self._tab_widget.addTab(self._saved_puzzles_tab, "Saved Puzzles")
 
-        # Piece list panel at bottom
-        piece_list_container = QWidget()
-        piece_list_layout = QHBoxLayout(piece_list_container)
-        piece_list_layout.setContentsMargins(10, 5, 10, 5)
-
-        piece_list_label = QLabel("Defined Pieces:")
-        piece_list_label.setFont(QFont("", weight=QFont.Weight.Bold))
-        piece_list_layout.addWidget(piece_list_label)
-
-        self._piece_list = QListWidget()
-        self._piece_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        self._piece_list.setMaximumHeight(120)
-        piece_list_layout.addWidget(self._piece_list)
-
-        main_layout.addWidget(piece_list_container)
-
         # Bottom button bar
         button_container = QWidget()
         button_layout = QHBoxLayout(button_container)
         button_layout.setContentsMargins(10, 5, 10, 10)
-
-        # Add piece button
-        self._add_piece_btn = QPushButton("Add Piece")
-        self._add_piece_btn.setMinimumWidth(100)
-        button_layout.addWidget(self._add_piece_btn)
-
-        # Delete piece button
-        self._delete_piece_btn = QPushButton("Delete Piece")
-        self._delete_piece_btn.setMinimumWidth(100)
-        button_layout.addWidget(self._delete_piece_btn)
 
         # Spacer
         button_layout.addStretch()
@@ -200,24 +170,6 @@ class EditorWindow(QMainWindow):
         solve_action.triggered.connect(self._on_solve)
         solve_menu.addAction(solve_action)
 
-    def _setup_toolbar(self) -> None:
-        """Set up the toolbar."""
-        toolbar = QToolBar("Main Toolbar")
-        toolbar.setMovable(False)
-        self.addToolBar(toolbar)
-
-        # New button
-        new_btn = QAction("New", self)
-        new_btn.triggered.connect(self._on_new_puzzle)
-        toolbar.addAction(new_btn)
-
-        toolbar.addSeparator()
-
-        # Solve button
-        solve_btn = QAction("Solve", self)
-        solve_btn.triggered.connect(self._on_solve)
-        toolbar.addAction(solve_btn)
-
     def _setup_status_bar(self) -> None:
         """Set up the status bar."""
         self._status_bar = QStatusBar()
@@ -226,19 +178,6 @@ class EditorWindow(QMainWindow):
 
     def _connect_signals(self) -> None:
         """Connect signals and slots."""
-        # Add piece button
-        self._add_piece_btn.clicked.connect(self._on_add_piece)
-
-        # Delete piece button
-        self._delete_piece_btn.clicked.connect(self._on_delete_piece)
-
-        # Solve button
-        self._solve_btn.clicked.connect(self._on_solve)
-
-        # Piece list selection
-        self._piece_list.currentRowChanged.connect(self._on_piece_selected)
-
-        # Board tab signals
         self._board_tab.dimensions_changed.connect(self._on_board_dimensions_changed)
         self._board_tab.blocked_cells_changed.connect(self._on_blocked_cells_changed)
 
@@ -257,31 +196,6 @@ class EditorWindow(QMainWindow):
             self._config.board_width, self._config.board_height
         )
         self._board_tab.set_blocked_cells(self._config.blocked_cells)
-
-    def _update_piece_list(self) -> None:
-        """Update the piece list widget."""
-        self._piece_list.clear()
-
-        for piece, count in self._config.pieces.items():
-            # Generate color for this piece type
-            if piece.name not in self._piece_colors:
-                color = get_piece_color(len(self._piece_colors))
-                self._piece_colors[piece.name] = (
-                    color.red(),
-                    color.green(),
-                    color.blue(),
-                )
-
-            item = QListWidgetItem(f"{piece.name} (×{count})")
-            item.setData(Qt.ItemDataRole.UserRole, piece.name)
-
-            # Set color indicator
-            color = self._piece_colors[piece.name]
-            item.setBackground(QColor(*color))
-
-            self._piece_list.addItem(item)
-
-        self._update_validation()
 
     def _update_validation(self) -> None:
         """Update validation status display."""
@@ -321,61 +235,28 @@ class EditorWindow(QMainWindow):
             )
             return
 
-        # Create new piece with unique name
-        piece_count = len(
-            [p for p in self._config.pieces if p.name.startswith("Piece")]
-        )
-        piece_name = f"Piece {piece_count + 1}"
-
-        new_piece = PuzzlePiece(name=piece_name, shape=shape)
+        # Create new piece
+        new_piece = PuzzlePiece(shape=shape)
 
         # Add to configuration
         self._config.add_piece(new_piece)
 
-        # Update piece list
-        self._update_piece_list()
-
-        self._status_bar.showMessage(f"Added piece: {piece_name}")
+        self._update_validation()
+        self._status_bar.showMessage(f"Added piece with {len(shape)} cells")
 
     def _on_delete_piece(self) -> None:
         """Handle delete piece button click."""
-        current_row = self._piece_list.currentRow()
-
-        if current_row < 0:
-            QMessageBox.warning(
-                self, "No Selection", "Please select a piece to delete."
-            )
+        # Delete the most recently added piece
+        if not self._config.pieces:
+            QMessageBox.warning(self, "No Pieces", "No pieces to delete.")
             return
 
-        # Get piece name from item
-        item = self._piece_list.item(current_row)
-        piece_name = item.data(Qt.ItemDataRole.UserRole)
-
-        # Find and remove the piece
-        for piece in list(self._config.pieces.keys()):
-            if piece.name == piece_name:
-                self._config.remove_piece(piece)
-                break
-
-        # Update piece list
-        self._update_piece_list()
-
-        self._status_bar.showMessage(f"Deleted piece: {piece_name}")
-
-    def _on_piece_selected(self, row: int) -> None:
-        """Handle piece selection in the list."""
-        if row < 0:
-            self._selected_piece_index = None
-            return
-
-        item = self._piece_list.item(row)
-        piece_name = item.data(Qt.ItemDataRole.UserRole)
-
-        # Find the piece and display it
-        for piece in self._config.pieces:
-            if piece.name == piece_name:
-                self._selected_piece_index = row
-                break
+        # Get the last piece from the dictionary
+        pieces_list = list(self._config.pieces.keys())
+        piece_to_delete = pieces_list[-1]
+        self._config.remove_piece(piece_to_delete)
+        self._update_validation()
+        self._status_bar.showMessage("Deleted last piece")
 
     def _on_board_dimensions_changed(self, width: int, height: int) -> None:
         """Handle board dimension changes."""
@@ -408,14 +289,14 @@ class EditorWindow(QMainWindow):
         """Handle piece added from piece tab."""
         # Sync with our configuration
         self._config.add_piece(piece)
-        self._update_piece_list()
+        self._update_validation()
 
     def _on_piece_deleted(self, piece: PuzzlePiece) -> None:
         """Handle piece deleted from piece tab."""
         # Sync with our configuration
         if piece in self._config.pieces:
             self._config.remove_piece(piece)
-        self._update_piece_list()
+        self._update_validation()
 
     def _on_new_puzzle(self) -> None:
         """Handle new puzzle action."""
@@ -434,9 +315,8 @@ class EditorWindow(QMainWindow):
                 pieces={},
                 blocked_cells=set(),
             )
-            self._piece_colors.clear()
             self._update_board()
-            self._update_piece_list()
+            self._update_validation()
             self._status_bar.showMessage("New puzzle created")
 
     def _on_save(self) -> None:
@@ -551,9 +431,8 @@ class EditorWindow(QMainWindow):
 
             loaded_config.name = loaded_config.name or "Imported Puzzle"
             self._config = loaded_config
-            self._piece_colors.clear()
             self._update_board()
-            self._update_piece_list()
+            self._update_validation()
             self._piece_tab.clear_all()
 
             self._status_bar.showMessage(f"Imported puzzle: {path.name}")
@@ -607,9 +486,8 @@ class EditorWindow(QMainWindow):
                 pieces={},
                 blocked_cells=set(),
             )
-            self._piece_colors.clear()
             self._update_board()
-            self._update_piece_list()
+            self._update_validation()
             self._piece_tab.clear_all()
             self._status_bar.showMessage("Cleared all pieces and reset board")
 
@@ -777,9 +655,8 @@ class EditorWindow(QMainWindow):
 
             loaded_config.name = loaded_config.name or "Imported Puzzle"
             self._config = loaded_config
-            self._piece_colors.clear()
             self._update_board()
-            self._update_piece_list()
+            self._update_validation()
             self._piece_tab.clear_all()
 
             self._status_bar.showMessage(f"Loaded puzzle: {filepath.name}")

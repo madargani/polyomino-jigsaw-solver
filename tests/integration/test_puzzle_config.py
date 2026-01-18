@@ -17,12 +17,8 @@ class TestPuzzleConfigurationCreation:
     def test_create_simple_puzzle_configuration(self) -> None:
         """Test creating a simple valid puzzle configuration."""
         # Create some pieces
-        l_piece = PuzzlePiece(
-            name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)}
-        )
-        t_piece = PuzzlePiece(
-            name="T-tetromino", shape={(0, 0), (0, 1), (0, 2), (1, 1)}
-        )
+        l_piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+        t_piece = PuzzlePiece(shape={(0, 0), (0, 1), (0, 2), (1, 1)})
 
         # Create configuration
         config = PuzzleConfiguration(
@@ -41,7 +37,7 @@ class TestPuzzleConfigurationCreation:
 
     def test_puzzle_configuration_with_blocked_cells(self) -> None:
         """Test creating configuration with blocked cells."""
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0)})
         blocked = {(1, 1), (1, 2)}
 
         config = PuzzleConfiguration(
@@ -56,7 +52,7 @@ class TestPuzzleConfigurationCreation:
 
     def test_validate_complete_configuration(self) -> None:
         """Test validating a complete puzzle configuration."""
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1)})
         config = PuzzleConfiguration(
             name="Test",
             board_width=4,
@@ -75,7 +71,7 @@ class TestPuzzleConfigurationCreation:
 
     def test_create_board_from_configuration(self) -> None:
         """Test creating a GameBoard from configuration."""
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0)})
         config = PuzzleConfiguration(
             name="Test",
             board_width=5,
@@ -92,8 +88,8 @@ class TestPuzzleConfigurationCreation:
 
     def test_get_all_pieces_expands_counts(self) -> None:
         """Test that get_all_pieces expands piece counts."""
-        l_piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
-        t_piece = PuzzlePiece(name="T", shape={(0, 0), (0, 1), (0, 2)})
+        l_piece = PuzzlePiece(shape={(0, 0), (1, 0)})
+        t_piece = PuzzlePiece(shape={(0, 0), (0, 1), (0, 2)})
 
         config = PuzzleConfiguration(
             name="Test", board_width=6, board_height=6, pieces={l_piece: 2, t_piece: 3}
@@ -106,27 +102,31 @@ class TestPuzzleConfigurationCreation:
         assert all_pieces.count(t_piece) == 3
 
     def test_get_piece_counts(self) -> None:
-        """Test getting piece name to count mapping."""
-        l_piece = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0)})
-        t_piece = PuzzlePiece(name="T-tetromino", shape={(0, 0), (0, 1)})
+        """Test getting piece shape to count mapping."""
+        # Use pieces with different canonical shapes
+        domino_piece = PuzzlePiece(shape={(0, 0), (1, 0)})  # 2 cells
+        triomino_piece = PuzzlePiece(
+            shape={(0, 0), (1, 0), (1, 1)}
+        )  # 3 cells (L-shape)
 
         config = PuzzleConfiguration(
-            name="Test", board_width=4, board_height=4, pieces={l_piece: 3, t_piece: 2}
+            name="Test",
+            board_width=4,
+            board_height=4,
+            pieces={domino_piece: 3, triomino_piece: 2},
         )
 
         counts = config.get_piece_counts()
 
-        assert counts["L-tetromino"] == 3
-        assert counts["T-tetromino"] == 2
+        # Check that we have 2 unique shapes
+        assert len(counts) == 2
+        # Check the counts (values should be 3 and 2 in some order)
+        assert sorted(counts.values()) == [2, 3]
 
     def test_get_piece_area(self) -> None:
         """Test calculating total piece area."""
-        l_piece = PuzzlePiece(
-            name="L", shape={(0, 0), (1, 0), (1, 1), (1, 2)}
-        )  # 4 cells
-        i_piece = PuzzlePiece(
-            name="I", shape={(0, 0), (0, 1), (0, 2), (0, 3)}
-        )  # 4 cells
+        l_piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1), (1, 2)})  # 4 cells
+        i_piece = PuzzlePiece(shape={(0, 0), (0, 1), (0, 2), (0, 3)})  # 4 cells
 
         config = PuzzleConfiguration(
             name="Test",
@@ -147,7 +147,7 @@ class TestPuzzleConfigurationCreation:
 
     def test_is_solvable_area(self) -> None:
         """Test area solvability check."""
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1)})  # 3 cells
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1)})  # 3 cells
 
         # Exact fit
         config1 = PuzzleConfiguration(
@@ -173,7 +173,7 @@ class TestPuzzleConfigurationModification:
 
     def test_add_piece(self) -> None:
         """Test adding a piece to configuration."""
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0)})
         config = PuzzleConfiguration(
             name="Test", board_width=4, board_height=4, pieces={}
         )
@@ -185,7 +185,7 @@ class TestPuzzleConfigurationModification:
 
     def test_remove_piece(self) -> None:
         """Test removing a piece from configuration."""
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0)})
         config = PuzzleConfiguration(
             name="Test", board_width=4, board_height=4, pieces={piece: 3}
         )
@@ -196,7 +196,7 @@ class TestPuzzleConfigurationModification:
 
     def test_add_same_piece_increments_count(self) -> None:
         """Test that adding same piece type increments count."""
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0)})
         config = PuzzleConfiguration(
             name="Test", board_width=4, board_height=4, pieces={piece: 1}
         )
@@ -211,7 +211,7 @@ class TestPuzzleConfigurationSerialization:
 
     def test_to_dict(self) -> None:
         """Test converting configuration to dictionary."""
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1)})
         config = PuzzleConfiguration(
             name="Test Puzzle",
             board_width=4,
@@ -226,7 +226,9 @@ class TestPuzzleConfigurationSerialization:
         assert data["board_width"] == 4
         assert data["board_height"] == 4
         assert len(data["pieces"]) == 1
-        assert data["pieces"][0]["name"] == "L"
+        # Pieces should have shape and count, but no name
+        assert "shape" in data["pieces"][0]
+        assert "name" not in data["pieces"][0]
         assert data["pieces"][0]["count"] == 2
         # Blocked cells are serialized as list of lists
         assert [1, 1] in data["blocked_cells"]
@@ -238,7 +240,7 @@ class TestPuzzleConfigurationSerialization:
             "board_width": 5,
             "board_height": 5,
             "blocked_cells": [[0, 0], [0, 1]],
-            "pieces": [{"name": "L", "shape": [[0, 0], [1, 0], [1, 1]], "count": 2}],
+            "pieces": [{"shape": [[0, 0], [1, 0], [1, 1]], "count": 2}],
             "created_at": "2026-01-14T12:00:00",
             "modified_at": "2026-01-14T12:30:00",
         }
@@ -252,7 +254,7 @@ class TestPuzzleConfigurationSerialization:
 
     def test_serialization_roundtrip(self) -> None:
         """Test that serialization roundtrip preserves data."""
-        piece = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1), (1, 2)})
         original = PuzzleConfiguration(
             name="Roundtrip Test",
             board_width=6,
@@ -277,7 +279,7 @@ class TestPuzzleStateIntegration:
 
     def test_create_state_from_config(self) -> None:
         """Test creating PuzzleState from PuzzleConfiguration."""
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0)})
         config = PuzzleConfiguration(
             name="Test", board_width=4, board_height=4, pieces={piece: 2}
         )
@@ -291,7 +293,7 @@ class TestPuzzleStateIntegration:
 
     def test_place_piece_updates_state(self) -> None:
         """Test that placing pieces updates state correctly."""
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0)})
         config = PuzzleConfiguration(
             name="Test", board_width=4, board_height=4, pieces={piece: 2}
         )
@@ -313,7 +315,7 @@ class TestPuzzleStateIntegration:
 
     def test_backtrack_removes_piece(self) -> None:
         """Test that backtracking removes pieces correctly."""
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0)})
         config = PuzzleConfiguration(
             name="Test", board_width=4, board_height=4, pieces={piece: 1}
         )
@@ -335,7 +337,7 @@ class TestPuzzleStateIntegration:
         # Create configuration with pieces that fill board exactly
         # 2x2 board = 4 cells
         # Each piece covers 2 cells, so we need 2 pieces
-        piece = PuzzlePiece(name="Domino", shape={(0, 0), (0, 1)})  # 2 cells horizontal
+        piece = PuzzlePiece(shape={(0, 0), (0, 1)})  # 2 cells horizontal
         config = PuzzleConfiguration(
             name="Test",
             board_width=4,

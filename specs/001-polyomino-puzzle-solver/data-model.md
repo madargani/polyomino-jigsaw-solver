@@ -16,12 +16,12 @@
 
 ## Entity Overview
 
-| Entity | Description | Module | Key Attributes |
-|--------|-------------|--------|----------------|
-| **PuzzlePiece** | Represents a connected shape made of square grid cells | `models/piece.py` | shape, name |
-| **GameBoard** | Represents the rectangular grid area where pieces must be placed | `models/board.py` | width, height, cells, blocked_cells |
-| **PuzzleState** | Represents the current state of the solving process | `models/puzzle_state.py` | board, placed_pieces, remaining_pieces |
-| **PuzzleConfiguration** | Represents a complete puzzle definition | `models/puzzle_config.py` | board_dimensions, pieces |
+| Entity                  | Description                                                      | Module                    | Key Attributes                         |
+| ----------------------- | ---------------------------------------------------------------- | ------------------------- | -------------------------------------- |
+| **PuzzlePiece**         | Represents a connected shape made of square grid cells           | `models/piece.py`         | shape                            |
+| **GameBoard**           | Represents the rectangular grid area where pieces must be placed | `models/board.py`         | width, height, cells, blocked_cells    |
+| **PuzzleState**         | Represents the current state of the solving process              | `models/puzzle_state.py`  | board, placed_pieces, remaining_pieces |
+| **PuzzleConfiguration** | Represents a complete puzzle definition                          | `models/puzzle_config.py` | board_dimensions, pieces               |
 
 ---
 
@@ -29,153 +29,34 @@
 
 ### PuzzlePiece
 
-**Purpose**: Represents a single polyomino piece with its shape. Color is generated dynamically during visualization and not stored with the piece. Pieces are identified by a unique name for dictionary storage.
+**Purpose**: Represents a single polyomino piece with its shape. Color is generated dynamically during visualization and not stored with the piece. Pieces are identified by their shape hash for dictionary storage.
 
 **Location**: `src/models/piece.py`
 
 #### Attributes
 
-| Attribute | Type | Description | Constraints |
-|-----------|------|-------------|-------------|
-| `name` | `str` | Unique identifier for the piece shape | Required, unique within puzzle |
-| `shape` | `Set[Tuple[int, int]]` | Set of (row, col) coordinates defining the piece shape | Required, non-empty, coordinates relative to origin (0,0) |
-| `area` | `int` | Number of cells in the piece (calculated) | Computed from `len(shape)`, ≥ 1 |
-| `precomputed_orientations` | `List['PuzzlePiece']` | Precomputed unique orientations (8 max) | Computed on init, includes 4 rotations × 2 mirrors |
+| Attribute                  | Type                   | Description                                            | Constraints                                               |
+| -------------------------- | ---------------------- | ------------------------------------------------------ | --------------------------------------------------------- |
+| `shape`                    | `Set[Tuple[int, int]]` | Set of (row, col) coordinates defining the piece shape | Required, non-empty, coordinates relative to origin (0,0) |
+| `area`                     | `int`                  | Number of cells in the piece (calculated)              | Computed from `len(shape)`, ≥ 1                           |
+| `precomputed_orientations` | `List['PuzzlePiece']`  | Precomputed unique orientations (8 max)                | Computed on init, includes 4 rotations × 2 mirrors        |
 
 #### Methods
 
 ```python
 class PuzzlePiece:
-    def __init__(self, name: str, shape: Set[Tuple[int, int]]) -> None:
+    def __init__(self, shape: Set[Tuple[int, int]]) -> None:
         """Initialize a puzzle piece.
 
         Args:
-            name: Unique identifier for the piece shape
             shape: Set of (row, col) coordinates defining the piece shape
 
         Raises:
             ValueError: If shape is empty or not contiguous
         """
-        self.name = name
         self.shape = shape
         # Precompute all 8 orientations (4 rotations × 2 mirrors) for performance
         self.precomputed_orientations = self._compute_all_orientations()
-
-    @classmethod
-    def with_id(cls, shape: Set[Tuple[int, int]], id: str) -> 'PuzzlePiece':
-        """Factory method to create a piece with an identifier for internal tracking.
-
-        Args:
-            shape: Set of (row, col) coordinates defining the piece shape
-            id: Unique identifier for the piece (used internally, not persisted)
-
-        Returns:
-            PuzzlePiece instance
-        """
-        piece = cls(shape)
-        piece._id = id
-        return piece
-
-    def _compute_all_orientations(self) -> List['PuzzlePiece']:
-        """Compute and cache all unique orientations (8 max: 4 rotations × 2 mirrors).
-
-        Returns:
-            List of unique PuzzlePiece orientations (deduplicated)
-        """
-        orientations = []
-
-        # Generate 4 rotations: 0°, 90°, 180°, 270°
-        current = self
-        for _ in range(4):
-            # Add original (not flipped) rotation
-            orientations.append(current)
-            # Add flipped version (horizontal flip)
-            flipped = current.flip('horizontal')
-            orientations.append(flipped)
-            # Rotate 90° for next iteration
-            current = current.rotate(90)
-
-        # Deduplicate orientations by shape
-        unique_orientations = []
-        seen_shapes = set()
-        for orientation in orientations:
-            # Normalize shape to tuple for hashing
-            normalized = tuple(sorted(orientation.shape))
-            if normalized not in seen_shapes:
-                seen_shapes.add(normalized)
-                unique_orientations.append(orientation)
-
-        return unique_orientations
-
-    def get_precomputed_orientations(self) -> List['PuzzlePiece']:
-        """Get precomputed orientations for solver use.
-
-        Returns:
-            List of unique PuzzlePiece orientations (precomputed for performance)
-        """
-        return self.precomputed_orientations
-
-    def rotate(self, degrees: int = 90) -> 'PuzzlePiece':
-        """Rotate the piece by specified degrees (90, 180, 270).
-
-        Args:
-            degrees: Rotation angle in degrees
-
-        Returns:
-            New PuzzlePiece with rotated shape
-
-        Raises:
-            ValueError: If degrees is not a multiple of 90
-        """
-
-    def flip(self, axis: str = 'horizontal') -> 'PuzzlePiece':
-        """Flip (mirror) the piece along specified axis.
-
-        Args:
-            axis: 'horizontal' or 'vertical'
-
-        Returns:
-            New PuzzlePiece with flipped shape
-
-        Raises:
-            ValueError: If axis is not 'horizontal' or 'vertical'
-        """
-
-    def get_normalized_shape(self) -> Set[Tuple[int, int]]:
-        """Return shape normalized to origin (min row/col = 0,0).
-
-        Returns:
-            Normalized shape coordinates
-        """
-
-    def get_rotations(self) -> List['PuzzlePiece']:
-        """Generate all unique rotations of this piece.
-
-        Returns:
-            List of unique PuzzlePiece rotations (deduplicated)
-        """
-
-    def get_all_orientations(self) -> List['PuzzlePiece']:
-        """Generate all unique rotations and flips of this piece.
-
-        Returns:
-            List of unique PuzzlePiece orientations (deduplicated)
-        """
-
-    def get_bounding_box(self) -> Tuple[int, int, int, int]:
-        """Get bounding box (min_row, max_row, min_col, max_col).
-
-        Returns:
-            Tuple of bounding box coordinates
-        """
-
-    @property
-    def width(self) -> int:
-        """Get piece width (max_col - min_col + 1)."""
-
-    @property
-    def height(self) -> int:
-        """Get piece height (max_row - min_row + 1)."""
 ```
 
 #### Validation Rules
@@ -184,7 +65,7 @@ class PuzzlePiece:
 2. **Contiguous**: All cells must be connected (4-directional adjacency)
 3. **Origin relative**: Shape should be normalized (min row/col = 0,0)
 4. **Unique rotations**: `get_rotations()` must return deduplicated orientations
-5. **Precomputed orientations**: Must include 8 total orientations (4 rotations × 2 mirrors), deduplicated
+5. **Precomputed orientations**: Must include up to 8 total orientations (4 rotations × 2 mirrors), deduplicated
 6. **Orientation count**: `get_precomputed_orientations()` returns 1-8 unique orientations based on piece symmetry
 
 #### State Transitions
@@ -213,18 +94,18 @@ class PuzzlePiece:
 
 #### Attributes
 
-| Attribute | Type | Description | Constraints |
-|-----------|------|-------------|-------------|
-| `width` | `int` | Number of columns in the board | Required, 1 ≤ width ≤ 50 |
-| `height` | `int` | Number of rows in the board | Required, 1 ≤ height ≤ 50 |
-| `cells` | `Dict[Tuple[int, int], Optional[str]]` | Grid cells mapping (row,col) → piece_id | Required, initialized to None |
-| `blocked_cells` | `Set[Tuple[int, int]]` | Set of initially filled (blocked) cell positions | Required, immutable, cannot be occupied by pieces |
-| `total_area` | `int` | Total number of cells (calculated) | Computed from width × height |
-| `available_area` | `int` | Number of cells available for pieces (calculated) | Computed from total_area - len(blocked_cells) |
+| Attribute        | Type                                   | Description                                       | Constraints                                       |
+| ---------------- | -------------------------------------- | ------------------------------------------------- | ------------------------------------------------- |
+| `width`          | `int`                                  | Number of columns in the board                    | Required, 1 ≤ width ≤ 50                          |
+| `height`         | `int`                                  | Number of rows in the board                       | Required, 1 ≤ height ≤ 50                         |
+| `cells`          | `Dict[Tuple[int, int], Optional[str]]` | Grid cells mapping (row,col) → piece_id           | Required, initialized to None                     |
+| `blocked_cells`  | `Set[Tuple[int, int]]`                 | Set of initially filled (blocked) cell positions  | Required, immutable, cannot be occupied by pieces |
+| `total_area`     | `int`                                  | Total number of cells (calculated)                | Computed from width × height                      |
+| `available_area` | `int`                                  | Number of cells available for pieces (calculated) | Computed from total_area - len(blocked_cells)     |
 
 #### Methods
 
-```python
+````python
 class GameBoard:
     def __init__(
         self,
@@ -369,17 +250,19 @@ class GameBoard:
 
 #### State Transitions
 
-```
+````
+
 [Empty Board]
-     │
-     ├─ place_piece(piece, pos) ──► [Piece Added]
-     │                              │
-     │                              ├─ place_piece(piece2, pos2) ──► [Multiple Pieces]
-     │                              │
-     │                              └─ remove_piece(piece, pos) ───► [Empty Board]
-     │
-      └─ clear() ──────────────────► [Empty Board]
-```
+│
+├─ place_piece(piece, pos) ──► [Piece Added]
+│ │
+│ ├─ place_piece(piece2, pos2) ──► [Multiple Pieces]
+│ │
+│ └─ remove_piece(piece, pos) ───► [Empty Board]
+│
+└─ clear() ──────────────────► [Empty Board]
+
+````
 
 ---
 
@@ -404,8 +287,8 @@ Many polyomino puzzles require multiple copies of the same piece shape. For exam
 
 ```python
 # Create unique piece definitions
-l_piece = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
-t_piece = PuzzlePiece(name="T-tetromino", shape={(0, 0), (0, 1), (0, 2), (1, 1)})
+l_piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+t_piece = PuzzlePiece(shape={(0, 0), (0, 1), (0, 2), (1, 1)})
 
 # A puzzle with 3 L's and 2 T's
 config = PuzzleConfiguration(
@@ -423,7 +306,7 @@ print(f"Total pieces: {sum(config.pieces.values())}")
 
 # Piece area: 3*4 + 2*4 = 20 cells
 print(f"Total area: {config.get_piece_area()}")
-```
+````
 
 ### Solver Integration
 
@@ -450,12 +333,12 @@ removed = state.remove_piece((0, 0))  # L_piece count increments back to 3
 
 #### Attributes
 
-| Attribute | Type | Description | Constraints |
-|-----------|------|-------------|-------------|
-| `board` | `GameBoard` | Current board configuration | Required |
-| `placed_pieces` | `List[Tuple[PuzzlePiece, Tuple[int, int]]]` | List of (piece, position) tuples | Required, ordered by placement |
-| `remaining_pieces` | `Dict[PuzzlePiece, int]` | Dictionary of piece to remaining count | Required, piece → count mapping |
-| `backtrack_history` | `List[Dict[str, Any]]` | History of solver operations | Required, append-only |
+| Attribute           | Type                                        | Description                            | Constraints                     |
+| ------------------- | ------------------------------------------- | -------------------------------------- | ------------------------------- |
+| `board`             | `GameBoard`                                 | Current board configuration            | Required                        |
+| `placed_pieces`     | `List[Tuple[PuzzlePiece, Tuple[int, int]]]` | List of (piece, position) tuples       | Required, ordered by placement  |
+| `remaining_pieces`  | `Dict[PuzzlePiece, int]`                    | Dictionary of piece to remaining count | Required, piece → count mapping |
+| `backtrack_history` | `List[Dict[str, Any]]`                      | History of solver operations           | Required, append-only           |
 
 #### Methods
 
@@ -496,7 +379,7 @@ class PuzzleState:
         """
         # Check if we have any of this piece remaining
         if self.remaining_pieces.get(piece, 0) <= 0:
-            raise ValueError(f"No more pieces of type '{piece.name}' remaining")
+            raise ValueError(f"No more pieces of this shape remaining")
 
         # Check if piece can be placed on board
         if not self.board.can_place_piece(piece, position):
@@ -627,15 +510,15 @@ class PuzzleState:
 
 #### Attributes
 
-| Attribute | Type | Description | Constraints |
-|-----------|------|-------------|-------------|
-| `name` | `str` | User-defined puzzle name | Required, unique within puzzles |
-| `board_width` | `int` | Board width in cells | Required, 1 ≤ width ≤ 50 |
-| `board_height` | `int` | Board height in cells | Required, 1 ≤ height ≤ 50 |
-| `blocked_cells` | `Set[Tuple[int, int]]` | Initially filled (blocked) cell positions | Optional, defaults to empty set |
-| `pieces` | `Dict[PuzzlePiece, int]` | Dictionary of piece to count | Required, non-empty, count ≥ 1 |
-| `created_at` | `datetime` | Timestamp when configuration was created | Required |
-| `modified_at` | `datetime` | Timestamp of last modification | Required |
+| Attribute       | Type                     | Description                               | Constraints                     |
+| --------------- | ------------------------ | ----------------------------------------- | ------------------------------- |
+| `name`          | `str`                    | User-defined puzzle name                  | Required, unique within puzzles |
+| `board_width`   | `int`                    | Board width in cells                      | Required, 1 ≤ width ≤ 50        |
+| `board_height`  | `int`                    | Board height in cells                     | Required, 1 ≤ height ≤ 50       |
+| `blocked_cells` | `Set[Tuple[int, int]]`   | Initially filled (blocked) cell positions | Optional, defaults to empty set |
+| `pieces`        | `Dict[PuzzlePiece, int]` | Dictionary of piece to count              | Required, non-empty, count ≥ 1  |
+| `created_at`    | `datetime`               | Timestamp when configuration was created  | Required                        |
+| `modified_at`   | `datetime`               | Timestamp of last modification            | Required                        |
 
 #### Methods
 
@@ -703,12 +586,12 @@ class PuzzleConfiguration:
         return all_pieces
 
     def get_piece_counts(self) -> Dict[str, int]:
-        """Get mapping of piece names to their counts.
+        """Get mapping of piece shapes to their counts.
 
         Returns:
-            Dictionary of piece_name -> count
+            Dictionary of piece shape hash -> count
         """
-        return {piece.name: count for piece, count in self.pieces.items()}
+        return {str(piece.shape): count for piece, count in self.pieces.items()}
 
     def get_board(self) -> GameBoard:
         """Create a GameBoard from configuration.
@@ -759,7 +642,7 @@ class PuzzleConfiguration:
             'board_height': self.board_height,
             'blocked_cells': list(self.blocked_cells),
             'pieces': [
-                {'name': piece.name, 'shape': list(piece.shape), 'count': count}
+                {'shape': list(piece.shape), 'count': count}
                 for piece, count in self.pieces.items()
             ],
             'created_at': self.created_at.isoformat(),
@@ -787,7 +670,8 @@ class PuzzleConfiguration:
         # Parse pieces with counts
         pieces_dict: Dict[PuzzlePiece, int] = {}
         for p in data['pieces']:
-            piece = PuzzlePiece(name=p['name'], shape=set(tuple(coord) for coord in p['shape']))
+            shape = set(tuple(coord) for coord in p['shape'])
+            piece = PuzzlePiece(shape=shape)
             count = p.get('count', 1)  # Default to 1 for backward compatibility
             pieces_dict[piece] = count
 
@@ -813,7 +697,7 @@ class PuzzleConfiguration:
 2. **Valid dimensions**: Board dimensions must be 1-50
 3. **Blocked cells in bounds**: All blocked_cells positions must be within board boundaries
 4. **Positive counts**: All piece counts must be ≥ 1
-5. **Unique piece names**: All piece names within a configuration must be unique
+5. **Unique piece shapes**: All piece shapes within a configuration must be unique (no duplicate shapes)
 6. **Area check**: Total piece area must equal available board area (total_area - blocked_cells) (optional warning, not error)
 7. **Unique name**: Puzzle name must be unique within saved puzzles
 
@@ -851,7 +735,6 @@ class PuzzleConfiguration:
          ▼                             │
 ┌─────────────────────┐   1..*         │    count
 │    PuzzlePiece       │◄───────────────┼───────────► int
-│ - name              │
 │ - shape             │
 └─────────────────────┘
          │
@@ -884,12 +767,12 @@ class PuzzleConfiguration:
 
 ### Relationship Descriptions
 
-| Relationship | Type | Description |
-|--------------|------|-------------|
-| **PuzzleConfiguration → PuzzlePiece** | 1..* → count | Configuration contains unique pieces with counts (e.g., 3 L-tetrominoes, 2 I-tetrominoes) |
-| **PuzzlePiece → GameBoard** | 0..* | Pieces can be placed on board (many orientations) |
-| **GameBoard → PuzzleState** | 1 | Board is tracked by exactly one state during solving |
-| **PuzzleState → Remaining Pieces** | 1..* → count | State tracks how many of each piece remain to be placed |
+| Relationship                          | Type          | Description                                                                               |
+| ------------------------------------- | ------------- | ----------------------------------------------------------------------------------------- |
+| **PuzzleConfiguration → PuzzlePiece** | 1..\* → count | Configuration contains unique pieces with counts (e.g., 3 L-tetrominoes, 2 I-tetrominoes) |
+| **PuzzlePiece → GameBoard**           | 0..\*         | Pieces can be placed on board (many orientations)                                         |
+| **GameBoard → PuzzleState**           | 1             | Board is tracked by exactly one state during solving                                      |
+| **PuzzleState → Remaining Pieces**    | 1..\* → count | State tracks how many of each piece remain to be placed                                   |
 
 ### Cascading Behaviors
 
@@ -912,7 +795,7 @@ class PuzzleConfiguration:
 
 2. **Blocked Cells vs Board Boundaries**
    - **Rule**: All blocked cell positions must be within board dimensions
-   - **Enforcement**: Error in GameBoard.__init__() and PuzzleConfiguration.validate()
+   - **Enforcement**: Error in GameBoard.**init**() and PuzzleConfiguration.validate()
    - **Rationale**: Prevents invalid state and ensures consistent behavior
 
 3. **Piece Placement vs Blocked Cells**
@@ -922,24 +805,24 @@ class PuzzleConfiguration:
 
 4. **Piece Count Validation**
    - **Rule**: All piece counts must be ≥ 1
-   - **Enforcement**: Error in PuzzleConfiguration.__init__() and add_piece()
+   - **Enforcement**: Error in PuzzleConfiguration.**init**() and add_piece()
    - **Rationale**: Negative or zero counts are invalid
 
-5. **Unique Piece Names**
-   - **Rule**: All piece names within a configuration must be unique
+5. **Unique Piece Shapes**
+   - **Rule**: All piece shapes within a configuration must be unique
    - **Enforcement**: Error in PuzzleConfiguration.add_piece()
-   - **Rationale**: Piece name is the dictionary key for identification
+   - **Rationale**: Duplicate shapes would cause dictionary key conflicts
 
 6. **Contiguous Piece Shapes**
    - **Rule**: All cells in a piece must be 4-connected
-   - **Enforcement**: Error in PuzzlePiece.__init__()
+   - **Enforcement**: Error in PuzzlePiece.**init**()
    - **Rationale**: By definition, polyominoes are connected shapes
 
 ### Validation Flow
 
 ```python
 # When creating a new puzzle with piece counts
-l_piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+l_piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1), (1, 2)})
 config = PuzzleConfiguration(
     name="My Puzzle",
     width=4,
@@ -964,7 +847,7 @@ else:
    - Invalid dimensions
    - Empty piece shape
    - Non-contiguous piece
-   - Duplicate piece names
+   - Duplicate piece shapes
    - Invalid piece counts (≤ 0)
    - Out-of-bounds placement
 
@@ -980,10 +863,12 @@ else:
 ### Immutable vs Mutable
 
 **Immutable** (return new instances):
+
 - `PuzzlePiece.rotate()`, `PuzzlePiece.flip()`
 - `GameBoard.copy()`, `PuzzleState.copy()`, `PuzzleConfiguration.copy()`
 
 **Mutable** (modify in place):
+
 - `GameBoard.place_piece()`, `GameBoard.remove_piece()`, `GameBoard.clear()`
 - `PuzzleState.place_piece()`, `PuzzleState.remove_piece()` (modifies remaining_pieces dict)
 - `PuzzleConfiguration.add_piece()`, `PuzzleConfiguration.remove_piece()` (modifies pieces dict)
@@ -998,21 +883,34 @@ else:
 ### Persistence Strategy
 
 **JSON Serialization Format**:
+
 ```json
 {
   "name": "My Puzzle",
   "board_width": 5,
   "board_height": 5,
-  "blocked_cells": [[0, 0], [0, 1], [2, 3]],
+  "blocked_cells": [
+    [0, 0],
+    [0, 1],
+    [2, 3]
+  ],
   "pieces": [
     {
-      "name": "L-tetromino",
-      "shape": [[0, 0], [1, 0], [1, 1], [1, 2]],
+      "shape": [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [1, 2]
+      ],
       "count": 3
     },
     {
-      "name": "I-tetromino",
-      "shape": [[0, 0], [0, 1], [0, 2], [0, 3]],
+      "shape": [
+        [0, 0],
+        [0, 1],
+        [0, 2],
+        [0, 3]
+      ],
       "count": 2
     }
   ],
@@ -1024,6 +922,7 @@ else:
 **Deserialization**: Reconstruct objects from dictionaries using `from_dict()` methods
 
 **File Locations**:
+
 - Saved puzzles: `~/.polyomino-puzzles/saved/{name}.json`
 - Exported puzzles: User-specified location
 
@@ -1039,10 +938,10 @@ from models.board import GameBoard
 from models.puzzle_config import PuzzleConfiguration
 
 # Define pieces (color is generated dynamically during visualization)
-# Each piece has a unique name for dictionary storage
-l_piece = PuzzlePiece(name="L-tetromino", shape={(0, 0), (1, 0), (1, 1), (1, 2)})
-t_piece = PuzzlePiece(name="T-tetromino", shape={(0, 0), (0, 1), (0, 2), (1, 1)})
-i_piece = PuzzlePiece(name="I-tetromino", shape={(0, 0), (0, 1), (0, 2), (0, 3)})
+# Each piece is identified by its shape for dictionary storage
+l_piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1), (1, 2)})
+t_piece = PuzzlePiece(shape={(0, 0), (0, 1), (0, 2), (1, 1)})
+i_piece = PuzzlePiece(shape={(0, 0), (0, 1), (0, 2), (0, 3)})
 
 # Create configuration with piece counts (dictionary format)
 config = PuzzleConfiguration(

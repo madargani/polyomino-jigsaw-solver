@@ -232,7 +232,7 @@ class TestValidatePuzzleConfig:
 
     def test_valid_config_returns_empty(self) -> None:
         """Test that valid config returns no errors."""
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1)})
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1)})
         pieces = [piece]
 
         errors = validate_puzzle_config(pieces=pieces, board_width=4, board_height=4)
@@ -250,7 +250,7 @@ class TestValidatePuzzleConfig:
     def test_area_mismatch_returns_error_when_pieces_exceed_board(self) -> None:
         """Test that area mismatch returns error when pieces exceed board."""
         # Create many pieces that exceed 3x3 board area (9 cells)
-        piece = PuzzlePiece(name="L", shape={(0, 0), (1, 0), (1, 1)})  # 3 cells
+        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1)})  # 3 cells
         pieces = [piece, piece, piece, piece]  # 12 cells total
 
         errors = validate_puzzle_config(
@@ -263,13 +263,16 @@ class TestValidatePuzzleConfig:
         error_types = [e.error_type for e in errors]
         assert "AREA_MISMATCH" in error_types
 
-    def test_duplicate_piece_names_returns_error(self) -> None:
-        """Test that duplicate piece names return error."""
-        # Create two pieces with same name
-        piece1 = PuzzlePiece(name="L", shape={(0, 0), (1, 0)})
-        piece2 = PuzzlePiece(name="L", shape={(0, 0), (0, 1)})  # Same name!
+    def test_duplicate_piece_shapes_returns_error(self) -> None:
+        """Test that duplicate piece shapes return error."""
+        # Create two pieces with the same shape
+        shape = {(0, 0), (1, 0)}
+        piece1 = PuzzlePiece(shape=shape)
+        piece2 = PuzzlePiece(shape=shape)  # Same shape!
         pieces = [piece1, piece2]
 
         errors = validate_puzzle_config(pieces=pieces, board_width=4, board_height=4)
 
         assert len(errors) >= 1
+        error_types = [e.error_type for e in errors]
+        assert "DUPLICATE_PIECE_SHAPE" in error_types
