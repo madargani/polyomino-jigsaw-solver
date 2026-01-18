@@ -6,9 +6,13 @@ defining puzzle pieces and board configurations.
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import override
+
 from PySide6.QtCore import QEvent, QSize, Qt
 from PySide6.QtGui import QAction, QColor, QFont
 from PySide6.QtWidgets import (
+    QFileDialog,
     QHBoxLayout,
     QLabel,
     QListWidget,
@@ -29,6 +33,9 @@ from src.gui.piece_tab import PieceTab
 from src.models.piece import PuzzlePiece
 from src.models.puzzle_config import PuzzleConfiguration
 from src.utils.color_generator import get_piece_color
+from src.utils.file_io import export_puzzle, import_puzzle, load_puzzle, save_puzzle
+
+SAVED_PUZZLES_DIR = Path.home() / ".polyomino-puzzles" / "saved"
 
 
 class EditorWindow(QMainWindow):
@@ -61,6 +68,7 @@ class EditorWindow(QMainWindow):
         self._setup_toolbar()
         self._setup_status_bar()
         self._connect_signals()
+        self._refresh_saved_puzzles_list()
 
     def _setup_ui(self) -> None:
         """Set up the user interface."""
@@ -80,9 +88,11 @@ class EditorWindow(QMainWindow):
         # Create tabs
         self._piece_tab = PieceTab()
         self._board_tab = BoardTab()
+        self._saved_puzzles_tab = self._create_saved_puzzles_tab()
 
         self._tab_widget.addTab(self._piece_tab, "Pieces")
         self._tab_widget.addTab(self._board_tab, "Board")
+        self._tab_widget.addTab(self._saved_puzzles_tab, "Saved Puzzles")
 
         # Piece list panel at bottom
         piece_list_container = QWidget()
@@ -117,6 +127,12 @@ class EditorWindow(QMainWindow):
 
         # Spacer
         button_layout.addStretch()
+
+        # Solve button
+        self._solve_btn = QPushButton("Solve")
+        self._solve_btn.setMinimumWidth(100)
+        self._solve_btn.setStyleSheet("font-weight: bold;")
+        button_layout.addWidget(self._solve_btn)
 
         # Validation status label
         self._validation_label = QLabel("")
@@ -215,6 +231,9 @@ class EditorWindow(QMainWindow):
 
         # Delete piece button
         self._delete_piece_btn.clicked.connect(self._on_delete_piece)
+
+        # Solve button
+        self._solve_btn.clicked.connect(self._on_solve)
 
         # Piece list selection
         self._piece_list.currentRowChanged.connect(self._on_piece_selected)
@@ -422,19 +441,154 @@ class EditorWindow(QMainWindow):
 
     def _on_save(self) -> None:
         """Handle save action."""
-        self._status_bar.showMessage("Save not implemented yet")
+        SAVED_PUZZLES_DIR.mkdir(parents=True, exist_ok=True)
+
+        puzzle_name, ok = QFileDialog.getSaveFileName(
+            self,
+            "Save Puzzle",
+            str(SAVED_PUZZLES_DIR),
+            "JSON Files (*.json)",
+        )
+
+        if not ok or not puzzle_name:
+            return
+
+        filepath = Path(puzzle_name)
+        if filepath.suffix != ".json":
+            filepath = filepath.with_suffix(".json")
+
+        try:
+            save_puzzle(self._config, filepath)
+            self._status_bar.showMessage(f"Puzzle saved: {filepath.name}")
+            QMessageBox.information(
+                self,
+                "Save Successful",
+                f"Puzzle saved to:\n{filepath}",
+            )
+            self._refresh_saved_puzzles_list()
+        except OSError as e:
+            QMessageBox.critical(
+                self,
+                "Save Failed",
+                f"Failed to save puzzle:\n{e}",
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Save Failed",
+                f"An unexpected error occurred:\n{e}",
+            )
 
     def _on_load(self) -> None:
         """Handle load action."""
-        self._status_bar.showMessage("Load not implemented yet")
+        SAVED_PUZZLES_DIR.mkdir(parents=True, exist_ok=True)
+
+        filepath, ok = QFileDialog.getOpenFileName(
+            self,
+            "Load Puzzle",
+            str(SAVED_PUZZLES_DIR),
+            "JSON Files (*.json)",
+        )
+
+        if not ok or not filepath:
+            return
+
+        self._load_puzzle_from_file(Path(filepath))
 
     def _on_export(self) -> None:
         """Handle export action."""
-        self._status_bar.showMessage("Export not implemented yet")
+        filepath, ok = QFileDialog.getSaveFileName(
+            self,
+            "Export Puzzle",
+            "",
+            "JSON Files (*.json)",
+        )
+
+        if not ok or not filepath:
+            return
+
+        export_path = Path(filepath)
+        if export_path.suffix != ".json":
+            export_path = export_path.with_suffix(".json")
+
+        try:
+            export_puzzle(self._config, export_path)
+            self._status_bar.showMessage(f"Puzzle exported: {export_path.name}")
+            QMessageBox.information(
+                self,
+                "Export Successful",
+                f"Puzzle exported to:\n{export_path}",
+            )
+        except OSError as e:
+            QMessageBox.critical(
+                self,
+                "Export Failed",
+                f"Failed to export puzzle:\n{e}",
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Export Failed",
+                f"An unexpected error occurred:\n{e}",
+            )
 
     def _on_import(self) -> None:
         """Handle import action."""
-        self._status_bar.showMessage("Import not implemented yet")
+        filepath, ok = QFileDialog.getOpenFileName(
+            self,
+            "Import Puzzle",
+            "",
+            "JSON Files (*.json)",
+        )
+
+        if not ok or not filepath:
+            return
+
+        path = Path(filepath)
+
+        try:
+            loaded_config = import_puzzle(path)
+
+            loaded_config.name = loaded_config.name or "Imported Puzzle"
+            self._config = loaded_config
+            self._piece_colors.clear()
+            self._update_board()
+            self._update_piece_list()
+            self._piece_tab.clear_all()
+
+            self._status_bar.showMessage(f"Imported puzzle: {path.name}")
+
+            QMessageBox.information(
+                self,
+                "Import Successful",
+                f"Puzzle imported:\n{path.name}\n\n"
+                f"Board: {self._config.board_width}x{self._config.board_height}\n"
+                f"Piece types: {len(self._config.pieces)}",
+            )
+        except FileNotFoundError:
+            QMessageBox.critical(
+                self,
+                "Import Failed",
+                f"File not found:\n{path}",
+            )
+        except ValueError as e:
+            QMessageBox.critical(
+                self,
+                "Import Failed",
+                f"Invalid puzzle file:\n{e}",
+            )
+        except OSError as e:
+            QMessageBox.critical(
+                self,
+                "Import Failed",
+                f"Failed to import puzzle:\n{e}",
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Import Failed",
+                f"An unexpected error occurred:\n{e}",
+            )
 
     def _on_clear(self) -> None:
         """Handle clear action."""
@@ -451,16 +605,60 @@ class EditorWindow(QMainWindow):
                 board_width=self._config.board_width,
                 board_height=self._config.board_height,
                 pieces={},
-                blocked_cells=self._config.blocked_cells.copy(),
+                blocked_cells=set(),
             )
             self._piece_colors.clear()
+            self._update_board()
             self._update_piece_list()
-            self._status_bar.showMessage("Cleared all pieces")
+            self._piece_tab.clear_all()
+            self._status_bar.showMessage("Cleared all pieces and reset board")
 
     def _on_solve(self) -> None:
         """Handle solve action."""
-        self._status_bar.showMessage("Solve not implemented yet")
+        # Validate configuration
+        if len(self._config.pieces) == 0:
+            QMessageBox.warning(
+                self,
+                "No Pieces",
+                "Please define at least one piece before solving.",
+            )
+            return
 
+        # Check if configuration is valid
+        piece_area = self._config.get_piece_area()
+        board_area = self._config.get_board_area() - len(self._config.blocked_cells)
+
+        if piece_area > board_area:
+            reply = QMessageBox.question(
+                self,
+                "Configuration Warning",
+                f"Warning: Total piece area ({piece_area}) exceeds available board area ({board_area}).\n\nThe puzzle may not have a solution.\n\nDo you want to try solving anyway?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply == QMessageBox.StandardButton.No:
+                return
+
+        # Import VizWindow here to avoid circular imports
+        try:
+            from src.gui.viz_window import VizWindow
+        except ImportError:
+            QMessageBox.critical(
+                self,
+                "Error",
+                "Visualization window is not available.",
+            )
+            return
+
+        # Create and show visualization window
+        viz_window = VizWindow(self._config)
+        viz_window.show()
+
+        # Start solving in background
+        viz_window.start_solving()
+
+        self._status_bar.showMessage("Solving...")
+
+    @override
     def closeEvent(self, event: QEvent) -> None:
         """Handle close event."""
         reply = QMessageBox.question(
@@ -474,3 +672,146 @@ class EditorWindow(QMainWindow):
             event.ignore()
         else:
             event.accept()
+
+    def _create_saved_puzzles_tab(self) -> QWidget:
+        """Create the saved puzzles tab widget.
+
+        Returns:
+            QWidget containing the saved puzzles list and controls
+        """
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        header_label = QLabel("Saved Puzzles")
+        header_label.setFont(QFont("", weight=QFont.Weight.Bold, pointSize=14))
+        layout.addWidget(header_label)
+
+        instructions = QLabel(
+            "Double-click a puzzle to load it.\n"
+            "Use File > Save to add puzzles to this list."
+        )
+        instructions.setStyleSheet("color: #666; font-style: italic;")
+        layout.addWidget(instructions)
+
+        self._saved_puzzles_list = QListWidget()
+        self._saved_puzzles_list.setSelectionMode(
+            QListWidget.SelectionMode.SingleSelection
+        )
+        self._saved_puzzles_list.itemDoubleClicked.connect(
+            self._on_saved_puzzle_double_clicked
+        )
+        layout.addWidget(self._saved_puzzles_list)
+
+        button_layout = QHBoxLayout()
+        refresh_btn = QPushButton("Refresh List")
+        refresh_btn.clicked.connect(self._refresh_saved_puzzles_list)
+        button_layout.addWidget(refresh_btn)
+
+        delete_btn = QPushButton("Delete Selected")
+        delete_btn.clicked.connect(self._on_delete_saved_puzzle)
+        button_layout.addWidget(delete_btn)
+
+        button_layout.addStretch()
+        layout.addLayout(button_layout)
+
+        return tab
+
+    def _refresh_saved_puzzles_list(self) -> None:
+        self._saved_puzzles_list.clear()
+
+        if not SAVED_PUZZLES_DIR.exists():
+            return
+
+        for filepath in sorted(SAVED_PUZZLES_DIR.glob("*.json")):
+            item = QListWidgetItem(filepath.stem)
+            item.setData(Qt.ItemDataRole.UserRole, filepath)
+            self._saved_puzzles_list.addItem(item)
+
+    def _on_saved_puzzle_double_clicked(self, item: QListWidgetItem) -> None:
+        filepath = item.data(Qt.ItemDataRole.UserRole)
+        if filepath:
+            self._load_puzzle_from_file(Path(filepath))
+
+    def _on_delete_saved_puzzle(self) -> None:
+        current_item = self._saved_puzzles_list.currentItem()
+        if not current_item:
+            QMessageBox.warning(
+                self,
+                "No Selection",
+                "Please select a puzzle to delete.",
+            )
+            return
+
+        filepath = current_item.data(Qt.ItemDataRole.UserRole)
+        if not filepath:
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Delete Puzzle",
+            f"Delete puzzle '{filepath.stem}'?\nThis action cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                Path(filepath).unlink()
+                self._refresh_saved_puzzles_list()
+                self._status_bar.showMessage(f"Deleted puzzle: {filepath.stem}")
+            except OSError as e:
+                QMessageBox.critical(
+                    self,
+                    "Delete Failed",
+                    f"Failed to delete puzzle:\n{e}",
+                )
+
+    def _load_puzzle_from_file(self, filepath: Path) -> None:
+        """Load a puzzle configuration from a file.
+
+        Args:
+            filepath: Path to the puzzle file
+        """
+        try:
+            loaded_config = load_puzzle(filepath)
+
+            loaded_config.name = loaded_config.name or "Imported Puzzle"
+            self._config = loaded_config
+            self._piece_colors.clear()
+            self._update_board()
+            self._update_piece_list()
+            self._piece_tab.clear_all()
+
+            self._status_bar.showMessage(f"Loaded puzzle: {filepath.name}")
+
+            QMessageBox.information(
+                self,
+                "Load Successful",
+                f"Puzzle loaded:\n{filepath.name}\n\n"
+                f"Board: {self._config.board_width}x{self._config.board_height}\n"
+                f"Piece types: {len(self._config.pieces)}",
+            )
+        except FileNotFoundError:
+            QMessageBox.critical(
+                self,
+                "Load Failed",
+                f"File not found:\n{filepath}",
+            )
+        except ValueError as e:
+            QMessageBox.critical(
+                self,
+                "Load Failed",
+                f"Invalid puzzle file:\n{e}",
+            )
+        except OSError as e:
+            QMessageBox.critical(
+                self,
+                "Load Failed",
+                f"Failed to load puzzle:\n{e}",
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Load Failed",
+                f"An unexpected error occurred:\n{e}",
+            )
