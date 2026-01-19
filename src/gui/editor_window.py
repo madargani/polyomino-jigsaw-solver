@@ -9,14 +9,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import override
 
-from PySide6.QtCore import QEvent, QSize, Qt
-from PySide6.QtGui import QAction, QFont
+from PySide6.QtCore import QEvent, QSize
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QLabel,
-    QListWidget,
-    QListWidgetItem,
     QMainWindow,
     QMessageBox,
     QPushButton,
@@ -29,6 +27,7 @@ from PySide6.QtWidgets import (
 
 from src.gui.board_tab import BoardTab
 from src.gui.piece_tab import PieceTab
+from src.gui.saved_puzzles_tab import SavedPuzzlesTab
 from src.models.piece import PuzzlePiece
 from src.models.puzzle_config import PuzzleConfiguration
 from src.utils.file_io import export_puzzle, import_puzzle, load_puzzle, save_puzzle
@@ -63,8 +62,7 @@ class EditorWindow(QMainWindow):
         self._setup_ui()
         self._setup_menu()
         self._setup_status_bar()
-        self._connect_signals()
-        self._refresh_saved_puzzles_list()
+        self._saved_puzzles_tab.refresh()
 
     def _setup_ui(self) -> None:
         """Set up the user interface."""
@@ -82,9 +80,19 @@ class EditorWindow(QMainWindow):
         main_layout.addWidget(self._tab_widget)
 
         # Create tabs
-        self._piece_tab = PieceTab()
-        self._board_tab = BoardTab()
-        self._saved_puzzles_tab = self._create_saved_puzzles_tab()
+        self._piece_tab = PieceTab(
+            on_piece_selected=self._on_piece_selected,
+            on_piece_added=self._on_piece_added,
+            on_piece_deleted=self._on_piece_deleted,
+        )
+        self._board_tab = BoardTab(
+            on_dimensions_changed=self._on_board_dimensions_changed,
+            on_blocked_cells_changed=self._on_blocked_cells_changed,
+        )
+        self._saved_puzzles_tab = SavedPuzzlesTab(
+            on_puzzle_selected=self._on_saved_puzzle_selected,
+            on_puzzle_deleted=self._on_saved_puzzle_deleted,
+        )
 
         self._tab_widget.addTab(self._piece_tab, "Pieces")
         self._tab_widget.addTab(self._board_tab, "Board")
@@ -176,14 +184,17 @@ class EditorWindow(QMainWindow):
         self.setStatusBar(self._status_bar)
         self._status_bar.showMessage("Ready")
 
-    def _connect_signals(self) -> None:
-        """Connect signals and slots."""
-        self._board_tab.dimensions_changed.connect(self._on_board_dimensions_changed)
-        self._board_tab.blocked_cells_changed.connect(self._on_blocked_cells_changed)
+    def _on_piece_selected(self, piece) -> None:
+        """Handle piece selection from piece tab."""
+        pass  # Currently no action needed on selection
 
-        # Piece tab signals
-        self._piece_tab.piece_added.connect(self._on_piece_added)
-        self._piece_tab.piece_deleted.connect(self._on_piece_deleted)
+    def _on_saved_puzzle_selected(self, filepath: Path) -> None:
+        """Handle saved puzzle selection."""
+        self._load_puzzle_from_file(filepath)
+
+    def _on_saved_puzzle_deleted(self, filepath: Path) -> None:
+        """Handle saved puzzle deletion."""
+        self._status_bar.showMessage(f"Deleted puzzle: {filepath.stem}")
 
     @property
     def config(self) -> PuzzleConfiguration:
@@ -221,42 +232,6 @@ class EditorWindow(QMainWindow):
         else:
             self._validation_label.setText("Configuration valid")
             self._validation_label.setStyleSheet("color: green;")
-
-    def _on_add_piece(self) -> None:
-        """Handle add piece button click."""
-        # Get shape from piece tab
-        shape = self._piece_tab.get_current_shape()
-
-        if not shape:
-            QMessageBox.warning(
-                self,
-                "No Shape",
-                "Please draw a piece shape on the grid first.",
-            )
-            return
-
-        # Create new piece
-        new_piece = PuzzlePiece(shape=shape)
-
-        # Add to configuration
-        self._config.add_piece(new_piece)
-
-        self._update_validation()
-        self._status_bar.showMessage(f"Added piece with {len(shape)} cells")
-
-    def _on_delete_piece(self) -> None:
-        """Handle delete piece button click."""
-        # Delete the most recently added piece
-        if not self._config.pieces:
-            QMessageBox.warning(self, "No Pieces", "No pieces to delete.")
-            return
-
-        # Get the last piece from the dictionary
-        pieces_list = list(self._config.pieces.keys())
-        piece_to_delete = pieces_list[-1]
-        self._config.remove_piece(piece_to_delete)
-        self._update_validation()
-        self._status_bar.showMessage("Deleted last piece")
 
     def _on_board_dimensions_changed(self, width: int, height: int) -> None:
         """Handle board dimension changes."""
@@ -345,7 +320,7 @@ class EditorWindow(QMainWindow):
                 "Save Successful",
                 f"Puzzle saved to:\n{filepath}",
             )
-            self._refresh_saved_puzzles_list()
+            self._saved_puzzles_tab.refresh()
         except OSError as e:
             QMessageBox.critical(
                 self,
@@ -550,99 +525,6 @@ class EditorWindow(QMainWindow):
             event.ignore()
         else:
             event.accept()
-
-    def _create_saved_puzzles_tab(self) -> QWidget:
-        """Create the saved puzzles tab widget.
-
-        Returns:
-            QWidget containing the saved puzzles list and controls
-        """
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(20, 20, 20, 20)
-
-        header_label = QLabel("Saved Puzzles")
-        header_label.setFont(QFont("", weight=QFont.Weight.Bold, pointSize=14))
-        layout.addWidget(header_label)
-
-        instructions = QLabel(
-            "Double-click a puzzle to load it.\n"
-            "Use File > Save to add puzzles to this list."
-        )
-        instructions.setStyleSheet("color: #666; font-style: italic;")
-        layout.addWidget(instructions)
-
-        self._saved_puzzles_list = QListWidget()
-        self._saved_puzzles_list.setSelectionMode(
-            QListWidget.SelectionMode.SingleSelection
-        )
-        self._saved_puzzles_list.itemDoubleClicked.connect(
-            self._on_saved_puzzle_double_clicked
-        )
-        layout.addWidget(self._saved_puzzles_list)
-
-        button_layout = QHBoxLayout()
-        refresh_btn = QPushButton("Refresh List")
-        refresh_btn.clicked.connect(self._refresh_saved_puzzles_list)
-        button_layout.addWidget(refresh_btn)
-
-        delete_btn = QPushButton("Delete Selected")
-        delete_btn.clicked.connect(self._on_delete_saved_puzzle)
-        button_layout.addWidget(delete_btn)
-
-        button_layout.addStretch()
-        layout.addLayout(button_layout)
-
-        return tab
-
-    def _refresh_saved_puzzles_list(self) -> None:
-        self._saved_puzzles_list.clear()
-
-        if not SAVED_PUZZLES_DIR.exists():
-            return
-
-        for filepath in sorted(SAVED_PUZZLES_DIR.glob("*.json")):
-            item = QListWidgetItem(filepath.stem)
-            item.setData(Qt.ItemDataRole.UserRole, filepath)
-            self._saved_puzzles_list.addItem(item)
-
-    def _on_saved_puzzle_double_clicked(self, item: QListWidgetItem) -> None:
-        filepath = item.data(Qt.ItemDataRole.UserRole)
-        if filepath:
-            self._load_puzzle_from_file(Path(filepath))
-
-    def _on_delete_saved_puzzle(self) -> None:
-        current_item = self._saved_puzzles_list.currentItem()
-        if not current_item:
-            QMessageBox.warning(
-                self,
-                "No Selection",
-                "Please select a puzzle to delete.",
-            )
-            return
-
-        filepath = current_item.data(Qt.ItemDataRole.UserRole)
-        if not filepath:
-            return
-
-        reply = QMessageBox.question(
-            self,
-            "Delete Puzzle",
-            f"Delete puzzle '{filepath.stem}'?\nThis action cannot be undone.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-
-        if reply == QMessageBox.StandardButton.Yes:
-            try:
-                Path(filepath).unlink()
-                self._refresh_saved_puzzles_list()
-                self._status_bar.showMessage(f"Deleted puzzle: {filepath.stem}")
-            except OSError as e:
-                QMessageBox.critical(
-                    self,
-                    "Delete Failed",
-                    f"Failed to delete puzzle:\n{e}",
-                )
 
     def _load_puzzle_from_file(self, filepath: Path) -> None:
         """Load a puzzle configuration from a file.

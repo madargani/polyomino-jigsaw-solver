@@ -153,7 +153,9 @@ class PuzzleConfiguration:
         Returns:
             Dictionary of piece shape string -> count
         """
-        return {str(piece.shape): count for piece, count in self._pieces.items()}
+        return {
+            str(piece.canonical_shape): count for piece, count in self._pieces.items()
+        }
 
     def update_piece(self, piece: PuzzlePiece, count: int = 1) -> None:
         """Update an existing piece in the configuration.
@@ -166,7 +168,7 @@ class PuzzleConfiguration:
             ValueError: If piece not found or shape is invalid
         """
         # Validate new shape
-        shape_errors = validate_piece_shape(piece.shape)
+        shape_errors = validate_piece_shape(set(piece.canonical_shape))
         if shape_errors:
             raise ValueError(f"Piece: {shape_errors[0].message}")
 
@@ -196,7 +198,7 @@ class PuzzleConfiguration:
 
         # Check piece contiguity using centralized validator
         for piece in self._pieces:
-            shape_errors = validate_piece_shape(piece.shape)
+            shape_errors = validate_piece_shape(set(piece.canonical_shape))
             for error in shape_errors:
                 errors.append(f"Piece: {error.message}")
 
@@ -227,7 +229,7 @@ class PuzzleConfiguration:
             ValueError: If piece is invalid
         """
         # Use centralized validation
-        shape_errors = validate_piece_shape(piece.shape)
+        shape_errors = validate_piece_shape(set(piece.canonical_shape))
         if shape_errors:
             raise ValueError(f"Piece: {shape_errors[0].message}")
 
@@ -311,7 +313,7 @@ class PuzzleConfiguration:
             "board_height": self._board_height,
             "blocked_cells": [[row, col] for row, col in self._blocked_cells],
             "pieces": [
-                {"shape": list(piece.shape), "count": count}
+                {"shape": list(piece.canonical_shape), "count": count}
                 for piece, count in self._pieces.items()
             ],
             "created_at": self._created_at.isoformat(),
@@ -383,7 +385,7 @@ class PuzzleConfiguration:
             New PuzzleConfiguration with identical state (including blocked cells)
         """
         pieces_copy = {
-            PuzzlePiece(shape=p.shape.copy()): count
+            PuzzlePiece(shape=set(p.canonical_shape)): count
             for p, count in self._pieces.items()
         }
         new_config = PuzzleConfiguration(
@@ -409,10 +411,14 @@ class PuzzleConfiguration:
             and self._blocked_cells == other._blocked_cells
             and len(self._pieces) == len(other._pieces)
             and all(
-                p1.shape == p2.shape and c1 == c2
+                p1.canonical_shape == p2.canonical_shape and c1 == c2
                 for (p1, c1), (p2, c2) in zip(
-                    sorted(self._pieces.items(), key=lambda x: str(x[0].shape)),
-                    sorted(other._pieces.items(), key=lambda x: str(x[0].shape)),
+                    sorted(
+                        self._pieces.items(), key=lambda x: str(x[0].canonical_shape)
+                    ),
+                    sorted(
+                        other._pieces.items(), key=lambda x: str(x[0].canonical_shape)
+                    ),
                 )
             )
         )

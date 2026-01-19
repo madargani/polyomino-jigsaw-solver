@@ -101,7 +101,7 @@ class GameBoard:
         Returns:
             True if piece fits without overlapping, going out of bounds, or hitting blocked cells
         """
-        piece_shape = piece.shape
+        piece_shape = piece.canonical_shape
         for row_offset, col_offset in piece_shape:
             row = position[0] + row_offset
             col = position[1] + col_offset
@@ -138,7 +138,7 @@ class GameBoard:
         Raises:
             ValueError: If piece cannot be placed at position
         """
-        piece_shape = piece.shape
+        piece_shape = piece.canonical_shape
         if not self.can_place_piece(piece, position):
             raise ValueError(
                 f"Cannot place piece at position {position} with shape {piece_shape}"
@@ -169,7 +169,7 @@ class GameBoard:
         Raises:
             ValueError: If piece is not found at position
         """
-        piece_shape = piece.shape
+        piece_shape = piece.canonical_shape
         # Verify piece exists at position
         piece_hash = hash(frozenset(piece_shape))
         for row_offset, col_offset in piece_shape:

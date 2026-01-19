@@ -152,7 +152,9 @@ class TestLoadPuzzle:
             assert loaded_config.board_height == 4
             assert len(loaded_config.pieces) == 1
             loaded_piece = list(loaded_config.pieces.keys())[0]
-            assert loaded_piece.shape == {(0, 0), (1, 0), (1, 1), (1, 2)}
+            assert loaded_piece.canonical_shape == frozenset(
+                {(0, 0), (0, 1), (0, 2), (1, 0)}
+            )
         finally:
             if filepath.exists():
                 filepath.unlink()
@@ -180,9 +182,11 @@ class TestLoadPuzzle:
 
             assert len(loaded_config.pieces) == 2
             for piece, count in loaded_config.pieces.items():
-                if piece.shape == {(0, 0), (1, 0), (1, 1), (1, 2)}:
+                if piece.canonical_shape == frozenset({(0, 0), (0, 1), (0, 2), (1, 0)}):
                     assert count == 2
-                elif piece.shape == {(0, 0), (0, 1), (0, 2), (1, 1)}:
+                elif piece.canonical_shape == frozenset(
+                    {(0, 0), (0, 1), (0, 2), (1, 1)}
+                ):
                     assert count == 3
         finally:
             if filepath.exists():

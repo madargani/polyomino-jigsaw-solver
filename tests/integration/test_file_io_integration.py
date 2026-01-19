@@ -41,7 +41,7 @@ class TestSaveLoadRoundtrip:
             loaded_piece = list(loaded_config.pieces.keys())[0]
             original_piece = list(original_config.pieces.keys())[0]
 
-            assert loaded_piece.shape == original_piece.shape
+            assert loaded_piece.canonical_shape == original_piece.canonical_shape
             assert (
                 loaded_config.pieces[loaded_piece]
                 == original_config.pieces[original_piece]
@@ -109,9 +109,13 @@ class TestSaveLoadRoundtrip:
             loaded_piece = list(loaded_config.pieces.keys())[0]
             original_piece = list(original_config.pieces.keys())[0]
 
-            assert loaded_piece.shape == original_piece.shape
-            assert len(loaded_piece.shape) == len(original_piece.shape)
-            assert loaded_piece.shape == {(0, 0), (1, 0), (1, 1), (2, 1), (2, 2)}
+            assert loaded_piece.canonical_shape == original_piece.canonical_shape
+            assert len(loaded_piece.canonical_shape) == len(
+                original_piece.canonical_shape
+            )
+            assert loaded_piece.canonical_shape == frozenset(
+                {(0, 0), (0, 1), (1, 1), (1, 2), (2, 2)}
+            )
         finally:
             if filepath.exists():
                 filepath.unlink()
@@ -222,7 +226,7 @@ class TestExportImportRoundtrip:
             imported_piece = list(imported_config.pieces.keys())[0]
             original_piece = list(original_config.pieces.keys())[0]
 
-            assert imported_piece.shape == original_piece.shape
+            assert imported_piece.canonical_shape == original_piece.canonical_shape
             assert imported_piece.area == original_piece.area
             assert imported_piece.width == original_piece.width
             assert imported_piece.height == original_piece.height

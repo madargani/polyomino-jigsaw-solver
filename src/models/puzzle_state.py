@@ -90,7 +90,7 @@ class PuzzleState:
             del self._remaining_pieces[piece]
 
         # Record operation
-        self.record_operation("place", str(piece.shape), position, piece)
+        self.record_operation("place", str(piece.canonical_shape), position, piece)
 
         return True
 
@@ -113,7 +113,7 @@ class PuzzleState:
                 # Increment remaining count
                 self._remaining_pieces[piece] = self._remaining_pieces.get(piece, 0) + 1
                 # Record operation
-                self.record_operation("remove", str(piece.shape), position)
+                self.record_operation("remove", str(piece.canonical_shape), position)
                 return piece
         return None
 
@@ -147,7 +147,7 @@ class PuzzleState:
         }
         if orientation is not None:
             entry["orientation"] = {
-                "shape": list(orientation.shape),
+                "shape": list(orientation.canonical_shape),
                 "width": orientation.width,
                 "height": orientation.height,
             }

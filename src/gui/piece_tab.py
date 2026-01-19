@@ -6,6 +6,8 @@ and editing polyomino pieces through a grid-based drawing interface.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPaintEvent, QPen, QResizeEvent
 from PySide6.QtWidgets import (
@@ -129,6 +131,7 @@ class PieceGridWidget(QWidget):
         self._grid_width = max(1, min(50, width))
         self._grid_height = max(1, min(50, height))
         self._trim_filled_cells()
+        self._calculate_cell_size()
         self.updateGeometry()
         self.update()
 
@@ -144,8 +147,10 @@ class PieceGridWidget(QWidget):
 
     def _calculate_cell_size(self) -> None:
         """Calculate optimal cell size based on available space."""
-        available_width = self.width() - 10
-        available_height = self.height() - 10
+        # Extra padding for labels (20px on each side)
+        padding = 25
+        available_width = self.width() - padding * 2
+        available_height = self.height() - padding * 2
 
         if self._grid_width > 0 and self._grid_height > 0:
             cell_width = available_width // self._grid_width
@@ -171,11 +176,16 @@ class PieceGridWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Calculate grid position (centered)
+        # Extra padding for labels
+        label_padding = 25
         grid_width = self._grid_width * self._cell_size
         grid_height = self._grid_height * self._cell_size
         offset_x = (self.width() - grid_width) // 2
         offset_y = (self.height() - grid_height) // 2
+
+        # Ensure labels have enough space
+        offset_x = max(offset_x, label_padding)
+        offset_y = max(offset_y, label_padding)
 
         # Draw cells
         for row in range(self._grid_height):
@@ -207,7 +217,7 @@ class PieceGridWidget(QWidget):
             # Column labels (top)
             for col in range(self._grid_width):
                 x = offset_x + col * self._cell_size + self._cell_size // 2
-                y = offset_y - 5
+                y = offset_y - 8
                 label = str(col)
                 metrics = painter.fontMetrics()
                 text_width = metrics.horizontalAdvance(label)
@@ -215,7 +225,7 @@ class PieceGridWidget(QWidget):
 
             # Row labels (left)
             for row in range(self._grid_height):
-                x = offset_x - 5
+                x = offset_x - 8
                 y = offset_y + row * self._cell_size + self._cell_size // 2
                 label = str(row)
                 metrics = painter.fontMetrics()
@@ -351,7 +361,7 @@ class PieceListItemWidget(QWidget):
 
     def _get_label_text(self) -> str:
         """Generate label like '(3×4) (7 cells)'."""
-        return f"({self._piece.width}×{self._piece.height}) ({len(self._piece.shape)} cells)"
+        return f"({self._piece.width}×{self._piece.height}) ({len(self._piece.canonical_shape)} cells)"
 
     def _get_count_text(self) -> str:
         """Generate count text like 'x3'."""
@@ -394,17 +404,34 @@ class PieceTab(QWidget):
     piece_deleted = Signal(PuzzlePiece)
     piece_modified = Signal(PuzzlePiece)
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        on_piece_selected: Callable[[PuzzlePiece | None], None] | None = None,
+        on_piece_added: Callable[[PuzzlePiece], None] | None = None,
+        on_piece_deleted: Callable[[PuzzlePiece], None] | None = None,
+        on_piece_modified: Callable[[PuzzlePiece], None] | None = None,
+    ) -> None:
         """Initialize the piece tab.
 
         Args:
             parent: Parent widget
+            on_piece_selected: Callback when a piece is selected (or None if deselected)
+            on_piece_added: Callback when a new piece is added
+            on_piece_deleted: Callback when a piece is deleted
+            on_piece_modified: Callback when a piece shape is modified
         """
         super().__init__(parent)
 
         self._pieces: dict[PuzzlePiece, int] = {}
         self._selected_piece: PuzzlePiece | None = None
         self._piece_counter = 0  # Only for generating unique labels
+
+        self._piece_selected_callback = on_piece_selected
+        self._piece_added_callback = on_piece_added
+        self._piece_deleted_callback = on_piece_deleted
+        self._piece_modified_callback = on_piece_modified
 
         self._init_ui()
 
@@ -500,7 +527,6 @@ class PieceTab(QWidget):
 
         # Piece grid
         self._grid_widget = PieceGridWidget()
-        self._grid_widget.setMinimumSize(300, 300)
         right_panel.addWidget(self._grid_widget)
 
         # Shape info
@@ -526,8 +552,8 @@ class PieceTab(QWidget):
             if 0 <= index < len(pieces_list):
                 self._selected_piece = pieces_list[index]
                 # Load the piece shape into the grid
-                shape = self._selected_piece.shape
-                self._grid_widget.filled_cells = shape.copy()
+                shape = self._selected_piece.canonical_shape
+                self._grid_widget.filled_cells = set(shape)
                 self._update_shape_info()
         else:
             self._selected_piece = None
@@ -535,6 +561,8 @@ class PieceTab(QWidget):
             self._update_shape_info()
 
         self.piece_selected.emit(self._selected_piece)
+        if self._piece_selected_callback:
+            self._piece_selected_callback(self._selected_piece)
 
     def _on_piece_item_clicked(self, item: QListWidgetItem) -> None:
         """Handle clicking on a piece list item.
@@ -568,6 +596,8 @@ class PieceTab(QWidget):
         self._select_piece_in_list(new_piece)
         self._piece_count_label.setText(f"Pieces: {len(self._get_all_pieces())}")
         self.piece_added.emit(new_piece)
+        if self._piece_added_callback:
+            self._piece_added_callback(new_piece)
 
     def _get_piece_label(self, piece: PuzzlePiece) -> str:
         """Generate a descriptive label for a piece.
@@ -578,7 +608,7 @@ class PieceTab(QWidget):
         Returns:
             A descriptive label showing shape info and count
         """
-        cell_count = len(piece.shape)
+        cell_count = len(piece.canonical_shape)
         count = self._pieces.get(piece, 1)
 
         # Try to identify the shape type
@@ -597,7 +627,7 @@ class PieceTab(QWidget):
         Returns:
             A string describing the shape type
         """
-        shape = piece.shape
+        shape = piece.canonical_shape
         area = len(shape)
 
         # Get bounding box dimensions
@@ -641,9 +671,7 @@ class PieceTab(QWidget):
                 return "Tetromino"
         else:
             # For larger pieces, use dimensions
-            if width == 1:
-                return f"Bar ({area})"
-            elif height == 1:
+            if width == 1 or height == 1:
                 return f"Bar ({area})"
             elif width == height:
                 return f"Square ({area})"
@@ -751,6 +779,8 @@ class PieceTab(QWidget):
         self._piece_count_label.setText(f"Pieces: {len(self._get_all_pieces())}")
 
         self.piece_deleted.emit(piece_to_delete)
+        if self._piece_deleted_callback:
+            self._piece_deleted_callback(piece_to_delete)
 
     def _on_clear_shape(self) -> None:
         """Handle clearing the current shape."""
@@ -770,6 +800,8 @@ class PieceTab(QWidget):
             self._selected_piece = new_piece
             self._refresh_piece_list()
             self.piece_modified.emit(new_piece)
+            if self._piece_modified_callback:
+                self._piece_modified_callback(new_piece)
 
     def _on_grid_size_changed(self) -> None:
         """Handle grid size changes."""
@@ -813,6 +845,8 @@ class PieceTab(QWidget):
             self._selected_piece = new_piece
             self._refresh_piece_list()
             self.piece_modified.emit(new_piece)
+            if self._piece_modified_callback:
+                self._piece_modified_callback(new_piece)
 
     def add_piece(self, piece: PuzzlePiece) -> None:
         """Add a piece to the list.

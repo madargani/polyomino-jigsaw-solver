@@ -6,6 +6,8 @@ the puzzle board dimensions and marking blocked cells.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPaintEvent, QPen, QResizeEvent
 from PySide6.QtWidgets import (
@@ -122,6 +124,7 @@ class BoardGridWidget(QWidget):
             if 0 <= r < self._height and 0 <= c < self._width
         }
 
+        self._calculate_cell_size()
         self.updateGeometry()
         self.update()
 
@@ -132,8 +135,10 @@ class BoardGridWidget(QWidget):
 
     def _calculate_cell_size(self) -> None:
         """Calculate optimal cell size based on available space."""
-        available_width = self.width() - 10  # 5px padding on each side
-        available_height = self.height() - 10
+        # Extra padding for labels (25px on each side)
+        padding = 25
+        available_width = self.width() - padding * 2
+        available_height = self.height() - padding * 2
 
         if self._width > 0 and self._height > 0:
             cell_width = available_width // self._width
@@ -159,11 +164,16 @@ class BoardGridWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Calculate grid position (centered)
+        # Extra padding for labels
+        label_padding = 25
         grid_width = self._width * self._cell_size
         grid_height = self._height * self._cell_size
         offset_x = (self.width() - grid_width) // 2
         offset_y = (self.height() - grid_height) // 2
+
+        # Ensure labels have enough space
+        offset_x = max(offset_x, label_padding)
+        offset_y = max(offset_y, label_padding)
 
         # Draw cells
         for row in range(self._height):
@@ -195,7 +205,7 @@ class BoardGridWidget(QWidget):
             # Column labels (top)
             for col in range(self._width):
                 x = offset_x + col * self._cell_size + self._cell_size // 2
-                y = offset_y - 5
+                y = offset_y - 8
                 label = str(col)
                 metrics = painter.fontMetrics()
                 text_width = metrics.horizontalAdvance(label)
@@ -203,7 +213,7 @@ class BoardGridWidget(QWidget):
 
             # Row labels (left)
             for row in range(self._height):
-                x = offset_x - 5
+                x = offset_x - 8
                 y = offset_y + row * self._cell_size + self._cell_size // 2
                 label = str(row)
                 metrics = painter.fontMetrics()
@@ -291,16 +301,31 @@ class BoardTab(QWidget):
     dimensions_changed = Signal(int, int)
     blocked_cells_changed = Signal(set)
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        on_dimensions_changed: Callable[[int, int], None] | None = None,
+        on_blocked_cells_changed: Callable[[set[tuple[int, int]]], None] | None = None,
+    ) -> None:
         """Initialize the board tab.
 
         Args:
             parent: Parent widget
+            on_dimensions_changed: Callback for dimension changes (width, height)
+            on_blocked_cells_changed: Callback for blocked cells changes
         """
         super().__init__(parent)
 
+        self._dimensions_callback = on_dimensions_changed
+        self._blocked_cells_callback = on_blocked_cells_changed
+
         self._init_ui()
-        self._connect_signals()
+
+        # Connect internal signals to callbacks
+        self._width_spinner.valueChanged.connect(self._on_dimension_changed)
+        self._height_spinner.valueChanged.connect(self._on_dimension_changed)
+        self._grid_widget.blocked_cells_changed.connect(self._on_blocked_cells_changed)
 
     def _init_ui(self) -> None:
         """Initialize the user interface."""
@@ -341,7 +366,6 @@ class BoardTab(QWidget):
 
         # Board grid
         self._grid_widget = BoardGridWidget()
-        self._grid_widget.setMinimumSize(300, 300)
         layout.addWidget(self._grid_widget, 4, 0, 1, 2)
 
         # Status info
@@ -352,18 +376,14 @@ class BoardTab(QWidget):
         # Set row stretch for the grid area to expand
         layout.setRowStretch(4, 1)
 
-    def _connect_signals(self) -> None:
-        """Connect signals to handlers."""
-        self._width_spinner.valueChanged.connect(self._on_dimension_changed)
-        self._height_spinner.valueChanged.connect(self._on_dimension_changed)
-        self._grid_widget.blocked_cells_changed.connect(self._on_blocked_cells_changed)
-
     def _on_dimension_changed(self) -> None:
         """Handle dimension spinner changes."""
         width = self._width_spinner.value()
         height = self._height_spinner.value()
         self._grid_widget.set_dimensions(width, height)
         self.dimensions_changed.emit(width, height)
+        if self._dimensions_callback:
+            self._dimensions_callback(width, height)
 
     def _on_blocked_cells_changed(self, cells: set[tuple[int, int]]) -> None:
         """Handle blocked cells changes.
@@ -373,6 +393,8 @@ class BoardTab(QWidget):
         """
         self._status_label.setText(f"Blocked cells: {len(cells)}")
         self.blocked_cells_changed.emit(cells)
+        if self._blocked_cells_callback:
+            self._blocked_cells_callback(cells)
 
     @property
     def board_width(self) -> int:

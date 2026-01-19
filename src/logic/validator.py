@@ -188,22 +188,22 @@ def validate_puzzle_config(
     # Check unique piece shapes
     piece_shapes = []
     for piece in pieces:
-        if not hasattr(piece, "shape"):
+        if not hasattr(piece, "canonical_shape"):
             errors.append(
                 ValidationError(
                     "MISSING_PIECE_SHAPE",
-                    f"Piece is missing shape attribute",
+                    f"Piece is missing canonical_shape attribute",
                 )
             )
             continue
 
-        shape = frozenset(piece.shape)
+        shape = piece.canonical_shape
         if shape in piece_shapes:
             errors.append(
                 ValidationError(
                     "DUPLICATE_PIECE_SHAPE",
                     f"Duplicate piece shape",
-                    {"shape": str(piece.shape)},
+                    {"shape": str(piece.canonical_shape)},
                 )
             )
         piece_shapes.append(shape)
@@ -211,18 +211,18 @@ def validate_puzzle_config(
     # Validate each piece shape
     total_piece_area = 0
     for piece in pieces:
-        if not hasattr(piece, "shape"):
+        if not hasattr(piece, "canonical_shape"):
             errors.append(
                 ValidationError(
                     "MISSING_PIECE_SHAPE",
-                    f"Piece is missing shape attribute",
+                    f"Piece is missing canonical_shape attribute",
                 )
             )
             continue
 
-        shape_errors = validate_piece_shape(piece.shape)
+        shape_errors = validate_piece_shape(set(piece.canonical_shape))
         errors.extend(shape_errors)
-        total_piece_area += len(piece.shape)
+        total_piece_area += len(piece.canonical_shape)
 
     # Check area compatibility
     board_area = board_width * board_height

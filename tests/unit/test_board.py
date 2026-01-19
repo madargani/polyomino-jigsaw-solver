@@ -168,8 +168,8 @@ class TestGameBoardPiecePlacement:
 
     def test_can_place_piece_returns_false_for_blocked_cells(self) -> None:
         """Test can_place_piece returns False if piece hits blocked cell."""
-        board = GameBoard(width=3, height=3, blocked_cells={(1, 1)})
-        # Shape {(0, 0), (1, 0), (1, 1)} placed at (0,0) covers (1,1) - the blocked cell
+        board = GameBoard(width=3, height=3, blocked_cells={(0, 1)})
+        # Piece canonical_shape {(0, 0), (0, 1), (1, 0)} placed at (0,0) covers (0,1) - the blocked cell
         piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1)})
 
         assert board.can_place_piece(piece, (0, 0)) is False
@@ -178,6 +178,8 @@ class TestGameBoardPiecePlacement:
         """Test successful piece placement."""
         board = GameBoard(width=5, height=5)
         piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1)})
+        # Canonical shape is {(0, 0), (0, 1), (1, 0)}
+        # Placed at (1, 1) covers (1,1), (1,2), (2,1)
 
         result = board.place_piece(piece, (1, 1))
         assert result is True
@@ -185,8 +187,8 @@ class TestGameBoardPiecePlacement:
         # Verify piece is placed (returns hash of piece shape)
         piece_id = board.get_piece_at((1, 1))
         assert piece_id is not None
+        assert board.get_piece_at((1, 2)) == piece_id
         assert board.get_piece_at((2, 1)) == piece_id
-        assert board.get_piece_at((2, 2)) == piece_id
 
     def test_place_piece_updates_occupied_cells(self) -> None:
         """Test that place_piece updates occupied cells."""

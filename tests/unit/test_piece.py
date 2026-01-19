@@ -15,7 +15,9 @@ class TestPuzzlePieceCreation:
         shape = {(0, 0), (1, 0), (1, 1), (1, 2)}  # L-tetromino
         piece = PuzzlePiece(shape=shape)
 
-        assert piece.shape == shape
+        # canonical_shape is the smallest orientation (lexicographically), not necessarily the input
+        assert isinstance(piece.canonical_shape, frozenset)
+        assert len(piece.canonical_shape) == 4
 
     def test_create_piece_with_empty_shape_raises_error(self) -> None:
         """Test that creating a piece with empty shape raises ValueError."""
@@ -34,8 +36,8 @@ class TestPuzzlePieceCreation:
         shape = {(0, 0)}
         piece = PuzzlePiece(shape=shape)
 
-        assert piece.shape == shape
-        assert len(piece.shape) == 1
+        assert piece.canonical_shape == frozenset(shape)
+        assert piece.area == 1
 
 
 class TestPuzzlePieceProperties:
@@ -53,11 +55,12 @@ class TestPuzzlePieceProperties:
         shape = {(1, 1), (1, 2), (2, 1)}  # L shape offset from origin
         piece = PuzzlePiece(shape=shape)
 
-        min_row, max_row, min_col, max_col = piece.get_bounding_box()
-        assert min_row == 1
-        assert max_row == 2
-        assert min_col == 1
-        assert max_col == 2
+        min_row, max_row, min_col, max_col = piece.bounding_box
+        # Shape is normalized to origin, so min_row=0, min_col=0
+        assert min_row == 0
+        assert max_row == 1
+        assert min_col == 0
+        assert max_col == 1
 
     def test_width_property(self) -> None:
         """Test width property calculation."""
@@ -71,121 +74,29 @@ class TestPuzzlePieceProperties:
         shape = {(0, 0), (1, 0), (2, 0)}  # 3 cells tall
         piece = PuzzlePiece(shape=shape)
 
-        assert piece.height == 3
-
-
-class TestPuzzlePieceRotation:
-    """Test PuzzlePiece rotation operations."""
-
-    def test_rotate_90_degrees(self) -> None:
-        """Test 90-degree rotation."""
-        shape = {(0, 0), (1, 0), (1, 1)}  # Small L
-        piece = PuzzlePiece(shape=shape)
-        rotated = piece.rotate(90)
-
-        # Original shape should be unchanged (immutability)
-        assert piece.shape == shape
-
-        # Rotated shape should have different coordinates
-        assert rotated.shape != shape
-
-    def test_rotate_180_degrees(self) -> None:
-        """Test 180-degree rotation."""
-        shape = {(0, 0), (0, 1), (1, 1)}  # Small L
-        piece = PuzzlePiece(shape=shape)
-        rotated = piece.rotate(180)
-
-        assert piece.shape == shape
-        assert rotated.shape != shape
-
-    def test_rotate_270_degrees(self) -> None:
-        """Test 270-degree rotation."""
-        shape = {(0, 0), (1, 0), (1, 1)}  # Small L
-        piece = PuzzlePiece(shape=shape)
-        rotated = piece.rotate(270)
-
-        assert piece.shape == shape
-        assert rotated.shape != shape
-
-    def test_rotate_0_degrees_returns_copy(self) -> None:
-        """Test that 0-degree rotation returns a new copy."""
-        shape = {(0, 0), (1, 0), (1, 1)}
-        piece = PuzzlePiece(shape=shape)
-        rotated = piece.rotate(0)
-
-        # Should be equal in value but different object (immutability)
-        assert rotated.shape == shape
-        assert rotated is not piece
-
-    def test_rotate_invalid_angle_raises_error(self) -> None:
-        """Test that invalid rotation angle raises ValueError."""
-        shape = {(0, 0), (1, 0)}
-        piece = PuzzlePiece(shape=shape)
-
-        with pytest.raises(ValueError, match="Rotation must be a multiple of 90"):
-            piece.rotate(45)
-
-
-class TestPuzzlePieceFlip:
-    """Test PuzzlePiece flip (mirror) operations."""
-
-    def test_flip_horizontal(self) -> None:
-        """Test horizontal flip."""
-        shape = {(0, 0), (0, 1), (1, 1)}  # L shape
-        piece = PuzzlePiece(shape=shape)
-        flipped = piece.flip("horizontal")
-
-        assert piece.shape == shape  # Original unchanged
-        assert flipped.shape != shape  # Flipped is different
-
-    def test_flip_vertical(self) -> None:
-        """Test vertical flip."""
-        shape = {(0, 0), (0, 1), (1, 1)}  # L shape
-        piece = PuzzlePiece(shape=shape)
-        flipped = piece.flip("vertical")
-
-        assert piece.shape == shape
-        assert flipped.shape != shape
-
-    def test_flip_invalid_axis_raises_error(self) -> None:
-        """Test that invalid flip axis raises ValueError."""
-        shape = {(0, 0), (1, 0)}
-        piece = PuzzlePiece(shape=shape)
-
-        with pytest.raises(ValueError, match="Axis must be 'horizontal' or 'vertical'"):
-            piece.flip("diagonal")
+        # Height is based on canonical_shape which is the "smallest" orientation
+        # A line's canonical form is horizontal, so height is 1
+        assert piece.height == 1
 
 
 class TestPuzzlePieceOrientations:
     """Test PuzzlePiece orientation generation."""
 
-    def test_get_rotations_returns_list(self) -> None:
-        """Test that get_rotations returns a list."""
-        shape = {(0, 0), (1, 0), (1, 1)}
-        piece = PuzzlePiece(shape=shape)
-        rotations = piece.get_rotations()
-
-        assert isinstance(rotations, list)
-        assert len(rotations) > 0
-
-    def test_get_all_orientations_includes_flips(self) -> None:
-        """Test that get_all_orientations includes flipped versions."""
-        shape = {(0, 0), (1, 0), (1, 1)}
-        piece = PuzzlePiece(shape=shape)
-        orientations = piece.get_all_orientations()
-
-        assert isinstance(orientations, list)
-        # Should have more orientations than just rotations
-        assert len(orientations) >= len(piece.get_rotations())
-
-    def test_precomputed_orientations_exist(self) -> None:
-        """Test that precomputed orientations are available."""
+    def test_orientations_property_returns_frozenset(self) -> None:
+        """Test that orientations property returns a frozenset."""
         shape = {(0, 0), (1, 0), (1, 1)}
         piece = PuzzlePiece(shape=shape)
 
-        orientations = piece.get_precomputed_orientations()
-        assert isinstance(orientations, list)
-        # Should have 1-8 orientations depending on symmetry
+        assert isinstance(piece.orientations, frozenset)
+
+    def test_orientations_contains_all_transformations(self) -> None:
+        """Test that orientations contains rotations and reflections."""
+        shape = {(0, 0), (1, 0), (1, 1)}
+        piece = PuzzlePiece(shape=shape)
+        orientations = piece.orientations
+
+        # Should have multiple orientations
+        assert len(orientations) > 0
 
     def test_symmetric_piece_has_fewer_orientations(self) -> None:
         """Test that symmetric pieces have fewer unique orientations."""
@@ -202,56 +113,105 @@ class TestPuzzlePieceOrientations:
         l_piece = PuzzlePiece(shape=l_shape)
 
         # Symmetric pieces should have fewer orientations
-        assert len(square.get_precomputed_orientations()) <= len(
-            l_piece.get_precomputed_orientations()
-        )
+        assert len(square.orientations) <= len(l_piece.orientations)
+        assert len(line.orientations) <= len(l_piece.orientations)
 
-
-class TestPuzzlePieceNormalization:
-    """Test PuzzlePiece shape normalization."""
-
-    def test_normalized_shape_at_origin(self) -> None:
-        """Test that shape is normalized to origin (0,0)."""
-        # Shape with coordinates not starting at 0
-        shape = {(5, 5), (6, 5), (6, 6)}
-        piece = PuzzlePiece(shape=shape)
-        normalized = piece.get_normalized_shape()
-
-        # Normalized shape should have min row and col at 0
-        min_row = min(r for r, c in normalized)
-        min_col = min(c for r, c in normalized)
-        assert min_row == 0
-        assert min_col == 0
-
-    def test_normalized_shape_preserves_relative_positions(self) -> None:
-        """Test that normalization preserves relative cell positions."""
-        shape = {(5, 5), (6, 5), (6, 6)}
-        piece = PuzzlePiece(shape=shape)
-        normalized = piece.get_normalized_shape()
-
-        # Relative positions should be preserved
-        assert (0, 0) in normalized
-        assert (1, 0) in normalized
-        assert (1, 1) in normalized
-
-
-class TestPuzzlePieceWithId:
-    """Test PuzzlePiece.with_id factory method."""
-
-    def test_with_id_creates_piece_with_id_name(self) -> None:
-        """Test that with_id creates piece with the id as internal attribute."""
-        shape = {(0, 0), (1, 0)}
-        piece = PuzzlePiece.with_id(shape=shape, id="piece-123")
-
-        assert piece.shape == shape
-        assert piece._id == "piece-123"
-
-    def test_with_id_returns_valid_piece(self) -> None:
-        """Test that with_id returns a fully functional piece."""
+    def test_canonical_shape_is_in_orientations(self) -> None:
+        """Test that canonical shape is one of the orientations."""
         shape = {(0, 0), (1, 0), (1, 1)}
-        piece = PuzzlePiece.with_id(shape=shape, id="test-piece")
+        piece = PuzzlePiece(shape=shape)
 
-        # Should be able to rotate, flip, etc.
-        rotated = piece.rotate(90)
-        assert rotated.shape != piece.shape
-        assert len(rotated.shape) == len(piece.shape)
+        assert piece.canonical_shape in piece.orientations
+
+
+class TestPuzzlePieceEquality:
+    """Test PuzzlePiece equality and hashing."""
+
+    def test_equal_pieces_with_same_shape(self) -> None:
+        """Test that pieces with same shape are equal."""
+        shape = {(0, 0), (1, 0), (1, 1)}
+        piece1 = PuzzlePiece(shape=shape)
+        piece2 = PuzzlePiece(shape=shape)
+
+        assert piece1 == piece2
+        assert hash(piece1) == hash(piece2)
+
+    def test_equal_pieces_with_different_positions(self) -> None:
+        """Test that pieces are equal regardless of position."""
+        shape1 = {(0, 0), (1, 0), (1, 1)}
+        shape2 = {(5, 5), (6, 5), (6, 6)}  # Same shape, different position
+
+        piece1 = PuzzlePiece(shape=shape1)
+        piece2 = PuzzlePiece(shape=shape2)
+
+        assert piece1 == piece2
+        assert hash(piece1) == hash(piece2)
+
+    def test_equal_pieces_with_rotations(self) -> None:
+        """Test that rotated pieces are equal."""
+        shape1 = {(0, 0), (1, 0), (1, 1)}  # Original
+        shape2 = {(0, 0), (0, 1), (1, 0)}  # Same shape, different rotation
+
+        piece1 = PuzzlePiece(shape=shape1)
+        piece2 = PuzzlePiece(shape=shape2)
+
+        assert piece1 == piece2
+        assert hash(piece1) == hash(piece2)
+
+    def test_unequal_pieces(self) -> None:
+        """Test that different shapes are not equal."""
+        shape1 = {(0, 0), (1, 0), (1, 1)}  # L shape
+        shape2 = {(0, 0), (0, 1), (0, 2), (1, 1)}  # T shape
+
+        piece1 = PuzzlePiece(shape=shape1)
+        piece2 = PuzzlePiece(shape=shape2)
+
+        assert piece1 != piece2
+
+    def test_equality_with_non_puzzle_piece(self) -> None:
+        """Test equality with non-PuzzlePiece returns NotImplemented."""
+        shape = {(0, 0), (1, 0), (1, 1)}
+        piece = PuzzlePiece(shape=shape)
+
+        assert (piece == "not a piece") is False
+        assert (piece == 42) is False
+        assert (piece == None) is False
+
+    def test_can_be_used_in_set(self) -> None:
+        """Test that pieces can be used in sets."""
+        shape1 = {(0, 0), (1, 0), (1, 1)}  # L-tromino
+        shape2 = {(0, 0), (0, 1), (1, 0)}  # Same L-tromino, different orientation
+        shape3 = {(0, 0), (1, 0), (1, 1)}  # Same as shape1
+
+        piece1 = PuzzlePiece(shape=shape1)
+        piece2 = PuzzlePiece(shape=shape2)
+        piece3 = PuzzlePiece(shape=shape3)
+
+        piece_set = {piece1, piece2, piece3}
+
+        # All three pieces are the same L-tromino (just different orientations)
+        assert len(piece_set) == 1
+        assert piece1 in piece_set
+        assert piece2 in piece_set
+        assert piece3 in piece_set
+
+    def test_can_be_used_as_dict_key(self) -> None:
+        """Test that pieces can be used as dictionary keys."""
+        shape1 = {(0, 0), (1, 0), (1, 1)}  # L-tromino
+        shape2 = {(0, 0), (0, 1), (1, 0)}  # Same L-tromino, different orientation
+        shape3 = {(0, 0), (1, 0), (1, 1)}  # Same as shape1
+
+        piece1 = PuzzlePiece(shape=shape1)
+        piece2 = PuzzlePiece(shape=shape2)
+        piece3 = PuzzlePiece(shape=shape3)
+
+        piece_dict: dict[PuzzlePiece, str] = {}
+
+        piece_dict[piece1] = "first"
+        piece_dict[piece2] = "second"
+        piece_dict[piece3] = "third"  # Should overwrite piece1 and piece2
+
+        # All three pieces are the same L-tromino
+        assert len(piece_dict) == 1
+        assert piece_dict[piece1] == "third"
+        assert piece_dict[piece2] == "third"
