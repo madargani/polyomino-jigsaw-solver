@@ -109,45 +109,216 @@
 
 ## Backtracking Visualization Pattern
 
-### Decision: Thread-based Solver with GUI Callbacks
+### Decision: Generator-Based Solver with QTimer
 
-**Rationale**: Using threading separates the solver logic from the GUI thread, keeping the UI responsive while allowing controlled updates.
+**Rationale**: Using a generator function with QTimer provides clean separation of concerns without thread synchronization complexity. The generator yields state snapshots at each backtracking step, and QTimer advances the generator at user-adjustable intervals.
 
 ### Pattern Overview
 
 ```python
 # Architecture
-┌─────────────────┐     ┌──────────────────┐
-│  GUI Thread     │     │  Solver Thread   │
-│  (Main Thread)  │     │  (Background)    │
-├─────────────────┤     ├──────────────────┤
-│ - Event loop    │◄────┤ - Backtracking   │
-│ - View updates  │     │   algorithm     │
-│ - User input    │     │ - Compute state │
-└─────────────────┘     └──────────────────┘
-        │                       │
-        │                       │
-        │ signals               │ callbacks
-        │                       │
-        ▼                       ▼
-   Update board            Place pieces
-   Animate placement       Backtrack on failure
+┌─────────────────────────────────────┐
+│       GUI Layer (VizWindow)         │
+│  - QTimer drives visualization      │
+│  - Consumes generator via next()    │
+│  - Updates visualization            │
+└─────────────────────┬───────────────┘
+                      │
+                      │ QTimer interval
+                      │ (user-adjustable)
+                      ▼
+┌─────────────────────────────────────┐
+│       Logic Layer (solver.py)       │
+│  - solve_backtracking() generator   │
+│  - Yields state snapshots           │
+│  - Pure algorithm, no GUI imports   │
+└─────────────────────────────────────┘
 ```
 
 ### Key Components
 
-#### 1. Threading Strategy
+#### 1. Generator Function
 
-**Approach**: Run solver in separate `threading.Thread` thread
+**Approach**: Use Python generator function that yields state at each step
 
 **Implementation Pattern**:
 ```python
 # In solver logic module
-class BacktrackingSolver:
-    def __init__(self, callback_delay: float = 0.1):
-        self.callback_delay = callback_delay
-        self.should_stop = False
-        self.update_callback = None  # GUI callback
+def solve_backtracking(
+    pieces: Dict[PuzzlePiece, int],
+    board: GameBoard
+) -> Iterator[Dict[str, Any]]:
+    """Generator that yields solver state at each backtracking step.
+    
+    Yields:
+        Dictionary with visualization data:
+        - 'type': 'attempt' | 'place' | 'remove' | 'solved' | 'no_solution'
+        - 'board_snapshot': GameBoard copy
+        - 'placed_pieces': List of (piece, position) tuples
+        - 'remaining_pieces': Dict of piece → count
+        - 'step_count': Number of operations performed
+    """
+    state = PuzzleState(board, pieces)
+    
+    # ... backtracking algorithm ...
+    
+    # Yield state before each attempt
+    yield {
+        'type': 'attempt',
+        'board_snapshot': board.copy(),
+        'placed_pieces': state.placed_pieces.copy(),
+        'remaining_pieces': state.remaining_pieces.copy(),
+        'step_count': len(state.backtrack_history),
+        'current_piece': piece,
+        'current_position': position
+    }
+    
+    # Place piece and yield
+    state.place_piece(piece, position)
+    yield {
+        'type': 'place',
+        'board_snapshot': board.copy(),
+        'placed_pieces': state.placed_pieces.copy(),
+        'remaining_pieces': state.remaining_pieces.copy(),
+        'step_count': len(state.backtrack_history)
+    }
+    
+    # ... recursion or backtrack ...
+    
+    # On backtrack, yield removal
+    state.remove_piece(position)
+    yield {
+        'type': 'remove',
+        'board_snapshot': board.copy(),
+        'placed_pieces': state.placed_pieces.copy(),
+        'remaining_pieces': state.remaining_pieces.copy(),
+        'step_count': len(state.backtrack_history)
+    }
+```
+
+#### 2. QTimer-Based Consumption
+
+**Approach**: Use Qt's QTimer to advance the generator at user-defined intervals
+
+**Implementation Pattern**:
+```python
+# In GUI window
+class VizWindow(QMainWindow):
+    def __init__(self, puzzle_config):
+        self._solver_timer = QTimer(self)
+        self._solver_timer.timeout.connect(self._advance_solver)
+    
+    def start_solver(self) -> None:
+        """Start solver visualization with generator + QTimer."""
+        self._solver_gen = solve_backtracking(
+            pieces=self.puzzle_config.pieces,
+            board=self.puzzle_config.get_board()
+        )
+        self._solver_timer.start(100)  # 100ms interval
+    
+    def _advance_solver(self) -> None:
+        """Advance generator by one step (called by QTimer)."""
+        try:
+            state = next(self._solver_gen)
+            self._update_visualization(state)
+        except StopIteration:
+            self._solver_timer.stop()
+            self._on_solver_finished(state)
+    
+    def set_speed(self, delay_ms: int) -> None:
+        """Adjust visualization speed by changing QTimer interval."""
+        self._solver_timer.setInterval(delay_ms)
+    
+    def stop_solver(self) -> None:
+        """Stop solver using generator.close()."""
+        self._solver_timer.stop()
+        if hasattr(self, '_solver_gen'):
+            self._solver_gen.close()
+```
+
+#### 3. State Snapshot Design
+
+**Key Design Decision**: Generator yields deep copies of the board to ensure thread-safe visualization:
+
+```python
+# Yield board snapshot (not reference)
+yield {
+    'board_snapshot': board.copy(),  # Deep copy for visualization
+    'placed_pieces': state.placed_pieces.copy(),
+    # ...
+}
+```
+
+**Benefits**:
+- Single-threaded, no race conditions
+- Visualization always sees consistent state
+- Easy pause/resume functionality to implement
+
+#### 4. Speed Control
+
+**Implementation**: Adjustable QTimer interval for visualization pacing:
+
+```python
+# Speed presets mapped to QTimer intervals
+SPEED_PRESETS = {
+    'slow': 500,    # 500ms per step
+    'medium': 100,  # 100ms per step
+    'fast': 10,     # 10ms per step
+}
+
+# Slider maps to range [10, 1000] ms
+def _on_speed_slider_changed(self, value: int) -> None:
+    self._solver_timer.setInterval(value)
+```
+
+### Why Generator Approach?
+
+| Aspect | Generator + QTimer | Threading + Callbacks |
+|--------|-------------------|----------------------|
+| Thread Safety | ✅ Single-threaded, inherently safe | ⚠️ Requires Qt signals/slots |
+| Cancellation | `generator.close()` | Simple `should_stop` flag |
+| Speed Control | QTimer interval | Modify `callback_delay` |
+| Code Complexity | Lower (no thread sync) | Higher (thread management) |
+| Performance | Sufficient for ≤50×50 puzzles | Better for large puzzles |
+| Testing | Easier (no thread mocking) | Harder (requires mocking) |
+| Debugging | Easier (linear execution) | Harder (race conditions) |
+
+**Decision Rationale**: For puzzles up to 50×50 cells:
+1. Solver computation per step is fast (<10ms typically)
+2. Single-threaded approach won't block UI noticeably
+3. Cleaner architecture eliminates thread synchronization bugs
+4. Easier to test and debug
+
+### Alternatives Evaluated
+
+#### 1. Threading + Callbacks (Original Approach)
+
+**Approach**: Run solver in `threading.Thread` with callback for updates
+
+**Weaknesses**:
+- Thread synchronization complexity
+- Requires Qt signals for thread-safe GUI updates
+- Harder to test (thread mocking required)
+- Potential race conditions
+
+**Why Rejected**: Generator approach provides simpler architecture for puzzle sizes in scope.
+
+#### 2. QThread with Signals
+
+**Approach**: Use Qt's `QThread` subclass with built-in signals
+
+**Comparison**:
+| Aspect | Generator + QTimer | QThread with Signals |
+|--------|-------------------|---------------------|
+| Integration | Manual timer + next() | Built-in signals |
+| Complexity | Lower | Higher (Qt patterns) |
+| Cancellation | `gen.close()` | `worker.requestInterruption()` |
+
+**Why Rejected**: Generator + QTimer is simpler for this use case.
+
+---
+
+## Summary of Architectural Decisions
 
     def solve(self, pieces: List[PuzzlePiece], board: GameBoard) -> bool:
         """Run backtracking with periodic GUI updates."""
@@ -909,7 +1080,7 @@ pip install uv
 - **File Format**: JSON
 
 **Key Architectural Decisions**:
-1. Thread-based solver with Qt signals for UI updates (keeps GUI responsive)
+1. Generator-based solver with QTimer for visualization (single-threaded, no threading complexity)
 2. Strict separation of concerns (logic/ vs gui/ modules)
 3. Mocking framework for unit testing (fast, CI-compatible tests)
 4. QGraphicsScene for performance (handles 40,000+ items smoothly)

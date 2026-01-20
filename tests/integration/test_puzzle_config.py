@@ -7,7 +7,6 @@ import pytest
 from src.models.piece import PuzzlePiece
 from src.models.board import GameBoard
 from src.models.puzzle_config import PuzzleConfiguration
-from src.models.puzzle_state import PuzzleState
 from src.logic.validator import validate_puzzle_config
 
 
@@ -272,90 +271,3 @@ class TestPuzzleConfigurationSerialization:
         assert restored.board_height == original.board_height
         assert len(restored.pieces) == len(original.pieces)
         assert restored.blocked_cells == original.blocked_cells
-
-
-class TestPuzzleStateIntegration:
-    """Integration tests with PuzzleState."""
-
-    def test_create_state_from_config(self) -> None:
-        """Test creating PuzzleState from PuzzleConfiguration."""
-        piece = PuzzlePiece(shape={(0, 0), (1, 0)})
-        config = PuzzleConfiguration(
-            name="Test", board_width=4, board_height=4, pieces={piece: 2}
-        )
-
-        board = config.get_board()
-        state = PuzzleState(board, config.pieces)
-
-        assert state.get_total_remaining_pieces() == 2
-        assert board.width == 4
-        assert board.height == 4
-
-    def test_place_piece_updates_state(self) -> None:
-        """Test that placing pieces updates state correctly."""
-        piece = PuzzlePiece(shape={(0, 0), (1, 0)})
-        config = PuzzleConfiguration(
-            name="Test", board_width=4, board_height=4, pieces={piece: 2}
-        )
-
-        board = config.get_board()
-        state = PuzzleState(board, config.pieces)
-
-        # Place first piece
-        result = state.place_piece(piece, (0, 0))
-        assert result is True
-        assert state.get_total_remaining_pieces() == 1
-        assert len(state.placed_pieces) == 1
-
-        # Place second piece
-        result = state.place_piece(piece, (2, 0))
-        assert result is True
-        assert state.get_total_remaining_pieces() == 0
-        assert len(state.placed_pieces) == 2
-
-    def test_backtrack_removes_piece(self) -> None:
-        """Test that backtracking removes pieces correctly."""
-        piece = PuzzlePiece(shape={(0, 0), (1, 0)})
-        config = PuzzleConfiguration(
-            name="Test", board_width=4, board_height=4, pieces={piece: 1}
-        )
-
-        board = config.get_board()
-        state = PuzzleState(board, config.pieces)
-
-        # Place and then remove
-        state.place_piece(piece, (0, 0))
-        assert state.get_total_remaining_pieces() == 0
-
-        removed = state.remove_piece((0, 0))
-        assert removed is not None
-        assert state.get_total_remaining_pieces() == 1
-        assert len(state.placed_pieces) == 0
-
-    def test_is_solved_when_all_pieces_placed(self) -> None:
-        """Test is_solved returns True when all pieces placed."""
-        # Create configuration with pieces that fill board exactly
-        # 2x2 board = 4 cells
-        # Each piece covers 2 cells, so we need 2 pieces
-        piece = PuzzlePiece(shape={(0, 0), (0, 1)})  # 2 cells horizontal
-        config = PuzzleConfiguration(
-            name="Test",
-            board_width=4,
-            board_height=2,  # 8 cells total
-            pieces={piece: 4},  # 4 dominoes = 8 cells
-        )
-
-        board = config.get_board()
-        state = PuzzleState(board, config.pieces)
-
-        assert state.is_solved() is False
-
-        # Place all pieces
-        state.place_piece(piece, (0, 0))  # Top-left
-        assert state.is_solved() is False
-        state.place_piece(piece, (0, 2))  # Top-right
-        assert state.is_solved() is False
-        state.place_piece(piece, (1, 0))  # Bottom-left
-        assert state.is_solved() is False
-        state.place_piece(piece, (1, 2))  # Bottom-right
-        assert state.is_solved() is True

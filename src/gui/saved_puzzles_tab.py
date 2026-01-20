@@ -11,16 +11,9 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
-from PySide6.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
-    QListWidget,
-    QListWidgetItem,
-    QMessageBox,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import (QHBoxLayout, QLabel, QListWidget,
+                               QListWidgetItem, QMessageBox, QPushButton,
+                               QVBoxLayout, QWidget)
 
 SAVED_PUZZLES_DIR = Path.home() / ".polyomino-puzzles" / "saved"
 

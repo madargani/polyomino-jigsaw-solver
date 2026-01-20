@@ -95,34 +95,35 @@ description: "Task list for Polyomino Puzzle Solver feature implementation"
 
 ## Phase 4: User Story 2 - Solve Puzzle Visualization (Priority: P2)
 
-**Goal**: User can click Solve button to open visualization window showing real-time backtracking algorithm attempting to place pieces
+**Goal**: User can click Solve button to open visualization window showing real-time backtracking algorithm attempting to place pieces using generator-based approach with QTimer
 
 **Independent Test**: Define a simple solvable puzzle (e.g., 2x2 board with two L-shaped trominoes), click solve, and verify visualization window opens showing board with pieces being placed and backtracked when dead ends occur.
 
+**Architecture Note**: Uses generator function pattern with QTimer instead of threading, eliminating thread synchronization complexity.
+
 ### Tests for User Story 2
 
-- [ ] T034 [P] [US2] Unit test for backtracking solver algorithm in tests/unit/test_solver.py
-- [ ] T035 [P] [US2] Unit test for solver callbacks and update signaling in tests/unit/test_solver.py
-- [ ] T036 [P] [US2] Integration test for end-to-end puzzle solve in tests/integration/test_puzzle_flow.py
-- [ ] T037 [P] [US2] GUI handler test for solve button and threading in tests/unit/test_gui_handlers.py
+- [x] T034 [P] [US2] Unit test for solve_backtracking() generator in tests/unit/test_solver.py
+- [x] T035 [P] [US2] Unit test for generator yield format and state snapshots in tests/unit/test_solver.py
+- [x] T036 [P] [US2] Integration test for end-to-end puzzle solve with generator in tests/integration/test_puzzle_flow.py
+- [x] T037 [P] [US2] GUI handler test for solve button and QTimer management in tests/unit/test_gui_handlers.py
 
 ### Implementation for User Story 2
 
-- [ ] T038 [P] [US2] Implement BacktrackingSolver class in src/logic/solver.py
-- [ ] T039 [US2] Implement backtracking algorithm with orientation generation in src/logic/solver.py
-- [ ] T040 [US2] Implement callback mechanism for solver updates in src/logic/solver.py
-- [ ] T041 [US2] Implement user-adjustable speed control with callback_delay in src/logic/solver.py
-- [ ] T042 [P] [US2] Create VizWindow for solver visualization in src/gui/viz_window.py
-- [ ] T043 [P] [US2] Create board visualization view in src/gui/viz_window.py
-- [ ] T044 [US2] Implement solver thread management in src/gui/editor_window.py
-- [ ] T045 [US2] Implement Qt signal for thread-safe solver-to-GUI communication in src/gui/viz_window.py
-- [ ] T046 [US2] Implement real-time board update visualization in src/gui/viz_window.py
-- [ ] T047 [US2] Implement speed control slider and presets in src/gui/viz_window.py
-- [ ] T048 [US2] Implement solution found / no solution found indicators in src/gui/viz_window.py
-- [ ] T049 [US2] Implement stop/interrupt solver functionality in src/gui/viz_window.py
-- [ ] T050 [US2] Integrate solve button in editor window with viz window launch in src/gui/editor_window.py
+- [x] T038 [P] [US2] Implement solve_backtracking() generator function in src/logic/solver.py
+- [x] T039 [US2] Implement backtracking algorithm with orientation generation in generator in src/logic/solver.py
+- [x] T040 [US2] Implement generator yield format with state snapshots in src/logic/solver.py
+- [x] T041 [US2] Implement StopIteration handling for solution/no_solution in src/logic/solver.py
+- [x] T042 [P] [US2] Create VizWindow for solver visualization in src/gui/viz_window.py
+- [x] T043 [P] [US2] Create board visualization view in src/gui/viz_window.py
+- [x] T044 [US2] Implement QTimer-based generator consumption in src/gui/viz_window.py
+- [x] T045 [US2] Implement speed control via QTimer interval adjustment in src/gui/viz_window.py
+- [x] T046 [US2] Implement real-time board update visualization from generator yields in src/gui/viz_window.py
+- [x] T047 [US2] Implement solution found / no solution found detection in src/gui/viz_window.py
+- [x] T048 [US2] Implement stop/interrupt solver via generator.close() in src/gui/viz_window.py
+- [x] T049 [US2] Integrate solve button in editor window with viz window launch in src/gui/editor_window.py
 
-**Checkpoint**: At this point, User Stories 1 AND 2 should both work independently. User can define puzzle and watch solver visualize backtracking in real-time.
+**Checkpoint**: At this point, User Stories 1 AND 2 should both work independently. User can define puzzle and watch solver visualize backtracking in real-time using generator + QTimer architecture. ✅ US2 COMPLETED
 
 ---
 
@@ -317,11 +318,11 @@ The following changes were made to align with updated design requirements:
 - Phase 1 (Setup): 9 tasks - ✅ COMPLETED
 - Phase 2 (Foundational): 7 tasks - ✅ COMPLETED
 - Phase 3 (US1): 17 tasks (5 tests + 12 implementation) - ✅ COMPLETED
-- Phase 4 (US2): 17 tasks (4 tests + 13 implementation) - PENDING
-- Phase 5 (US3): 18 tasks (6 tests + 12 implementation) - PENDING
+- Phase 4 (US2): 17 tasks (4 tests + 13 implementation) - ✅ COMPLETED
+- Phase 5 (US3): 18 tasks (6 tests + 12 implementation) - ✅ COMPLETED
 - Phase 6 (Polish): 15 tasks - PENDING
 
-**Progress**: 32/83 tasks completed (38%)
+**Progress**: 68/83 tasks completed (82%)
 
 **Parallel Opportunities**: 34 tasks marked with [P] can be run in parallel across different phases and within phases.
 

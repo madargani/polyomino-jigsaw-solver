@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 from src.gui.board_tab import BoardTab
 from src.gui.piece_tab import PieceTab
 from src.gui.saved_puzzles_tab import SavedPuzzlesTab
+from src.gui.visualization_window import VisualizationWindow
 from src.models.piece import PuzzlePiece
 from src.models.puzzle_config import PuzzleConfiguration
 from src.utils.file_io import export_puzzle, import_puzzle, load_puzzle, save_puzzle
@@ -110,6 +111,7 @@ class EditorWindow(QMainWindow):
         self._solve_btn = QPushButton("Solve")
         self._solve_btn.setMinimumWidth(100)
         self._solve_btn.setStyleSheet("font-weight: bold;")
+        self._solve_btn.clicked.connect(self._on_solve)
         button_layout.addWidget(self._solve_btn)
 
         # Validation status label
@@ -408,7 +410,11 @@ class EditorWindow(QMainWindow):
             self._config = loaded_config
             self._update_board()
             self._update_validation()
+
             self._piece_tab.clear_all()
+            for piece, count in self._config.pieces.items():
+                for _ in range(count):
+                    self._piece_tab.add_piece(piece)
 
             self._status_bar.showMessage(f"Imported puzzle: {path.name}")
 
@@ -491,23 +497,9 @@ class EditorWindow(QMainWindow):
             if reply == QMessageBox.StandardButton.No:
                 return
 
-        # Import VizWindow here to avoid circular imports
-        try:
-            from src.gui.viz_window import VizWindow
-        except ImportError:
-            QMessageBox.critical(
-                self,
-                "Error",
-                "Visualization window is not available.",
-            )
-            return
-
         # Create and show visualization window
-        viz_window = VizWindow(self._config)
+        viz_window = VisualizationWindow(self._config)
         viz_window.show()
-
-        # Start solving in background
-        viz_window.start_solving()
 
         self._status_bar.showMessage("Solving...")
 
@@ -539,7 +531,11 @@ class EditorWindow(QMainWindow):
             self._config = loaded_config
             self._update_board()
             self._update_validation()
+
             self._piece_tab.clear_all()
+            for piece, count in self._config.pieces.items():
+                for _ in range(count):
+                    self._piece_tab.add_piece(piece)
 
             self._status_bar.showMessage(f"Loaded puzzle: {filepath.name}")
 

@@ -10,7 +10,7 @@ A Python GUI application for solving polyomino puzzles using backtracking algori
 **Technical Approach**:
 
 - **GUI Framework**: PySide6 (Qt6 Python bindings) for high-performance real-time visualization
-- **Architecture**: Thread-based solver with Qt signals for thread-safe GUI updates
+- **Architecture**: Generator-based solver with QTimer for stepped execution (single-threaded, no threading complexity)
 - **Data Layer**: Immutable models (PuzzlePiece, GameBoard, PuzzleState, PuzzleConfiguration)
 - **Testing**: pytest + pytest-qt with mocked GUI components
 - **Dependency Management**: uv for fast, reproducible Python package management
@@ -34,13 +34,93 @@ A Python GUI application for solving polyomino puzzles using backtracking algori
 - **Consistent Interaction**: Both editors use identical interaction patterns (left-click, drag, right-click)
 - **Dynamic Colors**: Piece colors are generated during visualization, not stored with piece definitions
 
+## Generator-Based Solver Architecture
+
+### Overview
+
+The backtracking solver uses a **generator function** pattern instead of threading, providing clean separation of concerns without thread synchronization complexity:
+
+```
+┌─────────────────────────────────────────────────┐
+│         GUI Layer (gui/viz_window.py)           │
+│  - QTimer drives visualization speed            │
+│  - Consumes generator via next() calls          │
+│  - Updates board visualization from yielded data │
+└─────────────────────┬───────────────────────────┘
+                      │ QTimer interval (user-adjustable)
+                      ▼
+┌─────────────────────────────────────────────────┐
+│       Logic Layer (logic/solver.py)             │
+│  - solve_backtracking() generator function      │
+│  - Yields state snapshots at each step          │
+│  - Pure algorithm, no GUI dependencies          │
+└─────────────────────────────────────────────────┘
+```
+
+### Generator Yield Format
+
+The solver yields state dictionaries containing visualization data:
+
+```python
+# Example yield at each step:
+{
+    'type': 'attempt',  # or 'place', 'remove', 'solved', 'no_solution'
+    'board_snapshot': GameBoard,  # Deep copy for visualization
+    'placed_pieces': [(piece, position), ...],  # Current placements
+    'remaining_pieces': {piece: count, ...},    # Pieces left to place
+    'step_count': int,  # Total operations performed
+    'current_piece': PuzzlePiece,  # Optional: piece being attempted
+    'current_position': (row, col),  # Optional: position being tried
+}
+```
+
+### Speed Control
+
+User-adjustable visualization speed is implemented by changing QTimer interval:
+
+```python
+# In VizWindow:
+def set_speed(self, delay_ms: int) -> None:
+    """Adjust visualization speed (50ms = fast, 500ms = slow)."""
+    self._solver_timer.setInterval(delay_ms)
+```
+
+### Cancellation
+
+Solver cancellation uses `generator.close()` to stop execution cleanly:
+
+```python
+def stop_solver(self) -> None:
+    """Stop solver by closing generator."""
+    self._solver_timer.stop()
+    if hasattr(self, '_solver_gen'):
+        self._solver_gen.close()
+```
+
+### Why Generator Approach?
+
+| Aspect | Generator + QTimer | Threading + Callbacks |
+|--------|-------------------|----------------------|
+| Thread Safety | ✅ Single-threaded, inherently safe | ⚠️ Needs Qt signals/slots |
+| Cancellation | `gen.close()` | Simple flag (`should_stop`) |
+| Speed Control | QTimer interval change | Modify `callback_delay` |
+| Complexity | Lower (no thread sync) | Higher (thread management) |
+| Performance | Sufficient for ≤50×50 puzzles | Better for large puzzles |
+| Testing | Easier (no thread mocking) | Harder (thread mocking) |
+
+**Decision Rationale**: For puzzles up to 50×50 cells (2500 total cells), the single-threaded generator approach provides:
+- Cleaner architecture and easier testing
+- No thread synchronization bugs
+- Sufficient performance (solver computation is fast)
+- Natural pause/resume via QTimer control
+
 ## Constitution Check
 
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 - **Modularity & Decomposition**: ✅ Files split by responsibility (models/, logic/, gui/, utils/). Functions under 50 lines, files under 300 lines.
 - **Readability First**: ✅ All functions have type hints and docstrings. Descriptive naming throughout.
-- **GUI Separation of Concerns**: ✅ Business logic separated from UI code (logic/ vs gui/). Thread-based solver prevents GUI blocking.
+- **GUI Separation of Concerns**: ✅ Business logic separated from UI code (logic/ vs gui/). Generator-based solver with QTimer eliminates threading complexity.
 - **Code Quality Gates**: ✅ Linter (ruff), type checker (mypy), formatter (black) configured in pyproject.toml.
 - **Simplicity Over Complexity**: ✅ Minimal dependencies (PySide6 + testing libs). Standard library first approach. No premature optimization.
 
@@ -75,13 +155,13 @@ src/
 │   └── puzzle_config.py # PuzzleConfiguration class
 ├── logic/
 │   ├── __init__.py
-│   ├── solver.py        # BacktrackingSolver class
+│   ├── solver.py        # solve_backtracking() generator function
 │   ├── validator.py     # PuzzleValidator class
 │   └── rotation.py      # RotationOperations class
 ├── gui/
 │   ├── __init__.py
 │   ├── editor_window.py # EditorWindow class with tabbed interface (Pieces/Board tabs)
-│   ├── viz_window.py    # VizWindow class
+│   ├── viz_window.py    # VizWindow class (QTimer-driven generator consumer)
 │   ├── board_tab.py     # Tab for editing board
 │   └── piece_tab.py     # Tab for editing pieces
 ├── utils/
@@ -114,7 +194,7 @@ tests/
 ### Phase 0: Research (✅ COMPLETE)
 
 - GUI Framework Selection: PySide6 chosen for performance and cross-platform support
-- Backtracking Visualization: Thread-based solver with Qt signals
+- Backtracking Visualization: Generator-based solver with QTimer (single-threaded, eliminates threading complexity)
 - Testing Strategy: pytest + pytest-qt with mocked GUI components
 - Dependency Management: uv for fast Python package management
 

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from src.models.piece import PuzzlePiece
-
 
 class GameBoard:
     """Represents the rectangular grid area where pieces must be placed.
@@ -91,18 +89,19 @@ class GameBoard:
         """Get number of empty cells."""
         return sum(1 for cell in self._cells.values() if cell is None)
 
-    def can_place_piece(self, piece: PuzzlePiece, position: tuple[int, int]) -> bool:
-        """Check if a piece can be placed at the specified position.
+    def can_place_shape(
+        self, shape: frozenset[tuple[int, int]], position: tuple[int, int]
+    ) -> bool:
+        """Check if a shape can be placed at the specified position.
 
         Args:
-            piece: The puzzle piece to place
-            position: (row, col) position to place piece origin
+            shape: The shape cells as a frozenset of (row_offset, col_offset) tuples
+            position: (row, col) position to place shape origin
 
         Returns:
-            True if piece fits without overlapping, going out of bounds, or hitting blocked cells
+            True if shape fits without overlapping, going out of bounds, or hitting blocked cells
         """
-        piece_shape = piece.canonical_shape
-        for row_offset, col_offset in piece_shape:
+        for row_offset, col_offset in shape:
             row = position[0] + row_offset
             col = position[1] + col_offset
 
@@ -121,70 +120,51 @@ class GameBoard:
 
         return True
 
-    def place_piece(
-        self,
-        piece: PuzzlePiece,
-        position: tuple[int, int],
-    ) -> bool:
-        """Place a piece at the specified position.
+    def place_shape(
+        self, shape: frozenset[tuple[int, int]], position: tuple[int, int]
+    ) -> None:
+        """Place a shape at the specified position.
 
         Args:
-            piece: The puzzle piece to place
-            position: (row, col) position to place piece origin
-
-        Returns:
-            True if piece was placed successfully
+            shape: The shape cells as a frozenset of (row_offset, col_offset) tuples
+            position: (row, col) position to place shape origin
 
         Raises:
-            ValueError: If piece cannot be placed at position
+            ValueError: If shape cannot be placed at position
         """
-        piece_shape = piece.canonical_shape
-        if not self.can_place_piece(piece, position):
-            raise ValueError(
-                f"Cannot place piece at position {position} with shape {piece_shape}"
-            )
+        if not self.can_place_shape(shape, position):
+            raise ValueError(f"Cannot place shape at position {position}")
 
-        for row_offset, col_offset in piece_shape:
+        shape_hash = hash(shape)
+        for row_offset, col_offset in shape:
             row = position[0] + row_offset
             col = position[1] + col_offset
-            # Store piece identifier based on shape hash
-            self._cells[(row, col)] = hash(frozenset(piece_shape))
+            self._cells[(row, col)] = shape_hash
 
-        return True
-
-    def remove_piece(
-        self,
-        piece: PuzzlePiece,
-        position: tuple[int, int],
-    ) -> bool:
-        """Remove a piece from the board.
+    def remove_shape(
+        self, shape: frozenset[tuple[int, int]], position: tuple[int, int]
+    ) -> None:
+        """Remove a shape from the board.
 
         Args:
-            piece: The puzzle piece to remove
-            position: (row, col) position where piece is placed
-
-        Returns:
-            True if piece was removed successfully
+            shape: The shape cells as a frozenset of (row_offset, col_offset) tuples
+            position: (row, col) position where shape is placed
 
         Raises:
-            ValueError: If piece is not found at position
+            ValueError: If shape is not found at position
         """
-        piece_shape = piece.canonical_shape
-        # Verify piece exists at position
-        piece_hash = hash(frozenset(piece_shape))
-        for row_offset, col_offset in piece_shape:
+        shape_hash = hash(shape)
+        for row_offset, col_offset in shape:
             row = position[0] + row_offset
             col = position[1] + col_offset
-            if self._cells.get((row, col)) != piece_hash:
-                raise ValueError(f"Piece not found at position {position}")
+            if self._cells.get((row, col)) != shape_hash:
+                raise ValueError(f"Shape not found at position {position}")
 
-        # Remove the piece
-        for row_offset, col_offset in piece_shape:
+        # Remove the shape
+        for row_offset, col_offset in shape:
             row = position[0] + row_offset
             col = position[1] + col_offset
             self._cells[(row, col)] = None
-
-        return True
 
     def get_occupied_cells(self) -> set[tuple[int, int]]:
         """Get set of all occupied cell positions.

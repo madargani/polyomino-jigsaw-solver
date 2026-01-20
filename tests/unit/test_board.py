@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from src.models.board import GameBoard
-from src.models.piece import PuzzlePiece
 
 
 class TestGameBoardCreation:
@@ -134,116 +133,114 @@ class TestGameBoardCellAccess:
         assert result == -1
 
 
-class TestGameBoardPiecePlacement:
-    """Test GameBoard piece placement methods."""
+class TestGameBoardShapePlacement:
+    """Test GameBoard shape placement methods."""
 
-    def test_can_place_piece_returns_true_for_valid_placement(self) -> None:
-        """Test can_place_piece returns True for valid placement."""
+    def test_can_place_shape_returns_true_for_valid_placement(self) -> None:
+        """Test can_place_shape returns True for valid placement."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1)})
+        shape = frozenset({(0, 0), (1, 0), (1, 1)})
 
-        assert board.can_place_piece(piece, (0, 0)) is True
-        assert board.can_place_piece(piece, (3, 3)) is True
+        assert board.can_place_shape(shape, (0, 0)) is True
+        assert board.can_place_shape(shape, (3, 3)) is True
 
-    def test_can_place_piece_returns_false_for_overlap(self) -> None:
-        """Test can_place_piece returns False if piece overlaps existing."""
+    def test_can_place_shape_returns_false_for_overlap(self) -> None:
+        """Test can_place_shape returns False if shape overlaps existing."""
         board = GameBoard(width=5, height=5)
-        piece1 = PuzzlePiece(shape={(0, 0), (1, 0)})
-        piece2 = PuzzlePiece(shape={(0, 0), (0, 1)})
+        shape1 = frozenset({(0, 0), (1, 0)})
+        shape2 = frozenset({(0, 0), (0, 1)})
 
-        # Place first piece
-        board.place_piece(piece1, (0, 0))
+        # Place first shape
+        board.place_shape(shape1, (0, 0))
 
-        # Second piece overlaps at (0, 0)
-        assert board.can_place_piece(piece2, (0, 0)) is False
+        # Second shape overlaps at (0, 0)
+        assert board.can_place_shape(shape2, (0, 0)) is False
 
-    def test_can_place_piece_returns_false_for_out_of_bounds(self) -> None:
-        """Test can_place_piece returns False for out-of-bounds placement."""
+    def test_can_place_shape_returns_false_for_out_of_bounds(self) -> None:
+        """Test can_place_shape returns False for out-of-bounds placement."""
         board = GameBoard(width=3, height=3)
-        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1)})
+        shape = frozenset({(0, 0), (1, 0), (1, 1)})
 
-        # Piece would extend beyond board
-        assert board.can_place_piece(piece, (2, 2)) is False
-        assert board.can_place_piece(piece, (5, 0)) is False
+        # Shape would extend beyond board
+        assert board.can_place_shape(shape, (2, 2)) is False
+        assert board.can_place_shape(shape, (5, 0)) is False
 
-    def test_can_place_piece_returns_false_for_blocked_cells(self) -> None:
-        """Test can_place_piece returns False if piece hits blocked cell."""
+    def test_can_place_shape_returns_false_for_blocked_cells(self) -> None:
+        """Test can_place_shape returns False if shape hits blocked cell."""
         board = GameBoard(width=3, height=3, blocked_cells={(0, 1)})
-        # Piece canonical_shape {(0, 0), (0, 1), (1, 0)} placed at (0,0) covers (0,1) - the blocked cell
-        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1)})
+        # Shape {(0, 0), (0, 1), (1, 0)} placed at (0,0) covers (0,1) - the blocked cell
+        shape = frozenset({(0, 0), (0, 1), (1, 0)})
 
-        assert board.can_place_piece(piece, (0, 0)) is False
+        assert board.can_place_shape(shape, (0, 0)) is False
 
-    def test_place_piece_success(self) -> None:
-        """Test successful piece placement."""
+    def test_place_shape_success(self) -> None:
+        """Test successful shape placement."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1)})
-        # Canonical shape is {(0, 0), (0, 1), (1, 0)}
+        shape = frozenset({(0, 0), (0, 1), (1, 0)})
         # Placed at (1, 1) covers (1,1), (1,2), (2,1)
 
-        result = board.place_piece(piece, (1, 1))
-        assert result is True
+        board.place_shape(shape, (1, 1))
 
-        # Verify piece is placed (returns hash of piece shape)
-        piece_id = board.get_piece_at((1, 1))
-        assert piece_id is not None
-        assert board.get_piece_at((1, 2)) == piece_id
-        assert board.get_piece_at((2, 1)) == piece_id
+        # Verify shape is placed (returns hash of shape)
+        shape_id = board.get_piece_at((1, 1))
+        assert shape_id is not None
+        assert board.get_piece_at((1, 2)) == shape_id
+        assert board.get_piece_at((2, 1)) == shape_id
 
-    def test_place_piece_updates_occupied_cells(self) -> None:
-        """Test that place_piece updates occupied cells."""
+    def test_place_shape_updates_occupied_cells(self) -> None:
+        """Test that place_shape updates occupied cells."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(shape={(0, 0), (0, 1)})
+        shape = frozenset({(0, 0), (0, 1)})
 
-        board.place_piece(piece, (2, 2))
+        board.place_shape(shape, (2, 2))
 
         occupied = board.get_occupied_cells()
         assert (2, 2) in occupied
         assert (2, 3) in occupied
 
-    def test_place_piece_returns_false_for_invalid_placement(self) -> None:
-        """Test that place_piece raises ValueError for invalid placement."""
+    def test_place_shape_raises_for_invalid_placement(self) -> None:
+        """Test that place_shape raises ValueError for invalid placement."""
         board = GameBoard(width=3, height=3)
-        piece = PuzzlePiece(shape={(0, 0), (1, 0), (1, 1)})
+        shape = frozenset({(0, 0), (1, 0), (1, 1)})
 
         # Out of bounds - should raise ValueError
         with pytest.raises(ValueError):
-            board.place_piece(piece, (5, 5))
+            board.place_shape(shape, (5, 5))
 
 
-class TestGameBoardPieceRemoval:
-    """Test GameBoard piece removal methods."""
+class TestGameBoardShapeRemoval:
+    """Test GameBoard shape removal methods."""
 
-    def test_remove_piece_success(self) -> None:
-        """Test successful piece removal."""
+    def test_remove_shape_success(self) -> None:
+        """Test successful shape removal."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(shape={(0, 0), (1, 0)})
+        shape = frozenset({(0, 0), (1, 0)})
 
-        board.place_piece(piece, (1, 1))
-        board.remove_piece(piece, (1, 1))
+        board.place_shape(shape, (1, 1))
+        board.remove_shape(shape, (1, 1))
 
-        # Verify piece is removed
+        # Verify shape is removed
         assert board.get_piece_at((1, 1)) is None
         assert board.get_piece_at((2, 1)) is None
 
         occupied = board.get_occupied_cells()
         assert len(occupied) == 0
 
-    def test_remove_nonexistent_piece_raises_error(self) -> None:
-        """Test that removing non-existent piece raises ValueError."""
+    def test_remove_nonexistent_shape_raises_error(self) -> None:
+        """Test that removing non-existent shape raises ValueError."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(shape={(0, 0), (1, 0)})
+        shape = frozenset({(0, 0), (1, 0)})
 
         with pytest.raises(ValueError, match="not found"):
-            board.remove_piece(piece, (0, 0))
+            board.remove_shape(shape, (0, 0))
 
-    def test_remove_piece_restores_cells(self) -> None:
-        """Test that remove_piece properly restores cells."""
+    def test_remove_shape_restores_cells(self) -> None:
+        """Test that remove_shape properly restores cells."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(shape={(0, 0), (0, 1)})
+        shape = frozenset({(0, 0), (0, 1)})
 
-        board.place_piece(piece, (2, 2))
-        board.remove_piece(piece, (2, 2))
+        board.place_shape(shape, (2, 2))
+        board.remove_shape(shape, (2, 2))
 
         empty = board.get_empty_cells()
         assert (2, 2) in empty
@@ -258,39 +255,39 @@ class TestGameBoardState:
         board = GameBoard(width=5, height=5)
         assert board.is_empty() is True
 
-    def test_is_empty_returns_false_after_piece_placed(self) -> None:
-        """Test is_empty returns False after piece placement."""
+    def test_is_empty_returns_false_after_shape_placed(self) -> None:
+        """Test is_empty returns False after shape placement."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(shape={(0, 0)})
+        shape = frozenset({(0, 0)})
 
-        board.place_piece(piece, (0, 0))
+        board.place_shape(shape, (0, 0))
         assert board.is_empty() is False
 
     def test_is_full_returns_true_when_board_completely_filled(self) -> None:
         """Test is_full returns True when board is completely filled."""
-        # 2x2 board with one 2x2 piece
+        # 2x2 board with one 2x2 shape
         board = GameBoard(width=2, height=2)
-        piece = PuzzlePiece(shape={(0, 0), (0, 1), (1, 0), (1, 1)})
+        shape = frozenset({(0, 0), (0, 1), (1, 0), (1, 1)})
 
-        board.place_piece(piece, (0, 0))
+        board.place_shape(shape, (0, 0))
         assert board.is_full() is True
 
     def test_is_full_returns_false_when_board_not_full(self) -> None:
         """Test is_full returns False when board is not full."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(shape={(0, 0)})
+        shape = frozenset({(0, 0)})
 
-        board.place_piece(piece, (0, 0))
+        board.place_shape(shape, (0, 0))
         assert board.is_full() is False
 
-    def test_clear_removes_all_pieces(self) -> None:
-        """Test that clear removes all placed pieces."""
+    def test_clear_removes_all_shapes(self) -> None:
+        """Test that clear removes all placed shapes."""
         board = GameBoard(width=5, height=5)
-        piece1 = PuzzlePiece(shape={(0, 0)})
-        piece2 = PuzzlePiece(shape={(0, 0)})
+        shape1 = frozenset({(0, 0)})
+        shape2 = frozenset({(1, 1)})
 
-        board.place_piece(piece1, (0, 0))
-        board.place_piece(piece2, (1, 1))
+        board.place_shape(shape1, (0, 0))
+        board.place_shape(shape2, (1, 1))
         board.clear()
 
         assert board.is_empty() is True
@@ -303,8 +300,9 @@ class TestGameBoardCopy:
     def test_copy_creates_independent_board(self) -> None:
         """Test that copy creates an independent board instance."""
         board = GameBoard(width=5, height=5)
-        piece = PuzzlePiece(shape={(0, 0)})
-        board.place_piece(piece, (0, 0))
+        shape1 = frozenset({(0, 0)})
+        shape2 = frozenset({(0, 0)})
+        board.place_shape(shape1, (0, 0))
 
         copied = board.copy()
 
@@ -313,7 +311,7 @@ class TestGameBoardCopy:
         assert copied.height == board.height
 
         # Should be independent - modifying original shouldn't affect copy
-        board.place_piece(PuzzlePiece(shape={(0, 0)}), (1, 1))
+        board.place_shape(shape2, (1, 1))
         piece_id = board.get_piece_at((1, 1))
         assert piece_id is not None
         assert copied.get_piece_at((1, 1)) is None
@@ -333,16 +331,16 @@ class TestGameBoardFilledArea:
     def test_filled_area_property(self) -> None:
         """Test filled_area returns correct count."""
         board = GameBoard(width=4, height=4)
-        piece1 = PuzzlePiece(shape={(0, 0), (0, 1)})  # 2 cells
-        piece2 = PuzzlePiece(shape={(0, 0), (0, 1), (0, 2)})  # 3 cells
+        shape1 = frozenset({(0, 0), (0, 1)})  # 2 cells
+        shape2 = frozenset({(0, 0), (0, 1), (0, 2)})  # 3 cells
 
         assert board.filled_area == 0
 
-        board.place_piece(piece1, (0, 0))
+        board.place_shape(shape1, (0, 0))
         assert board.filled_area == 2
 
-        # Place piece2 at valid position (2, 1) - fits within 4x4 board
-        board.place_piece(piece2, (2, 1))
+        # Place shape2 at valid position (2, 1) - fits within 4x4 board
+        board.place_shape(shape2, (2, 1))
         assert board.filled_area == 5
 
     def test_empty_area_property(self) -> None:
@@ -351,8 +349,7 @@ class TestGameBoardFilledArea:
 
         assert board.empty_area == 16 - 1  # Total minus blocked
 
-        piece = PuzzlePiece(shape={(0, 0), (0, 1), (0, 2)})
-        board.place_piece(piece, (1, 1))
+        board.place_shape(frozenset({(0, 0), (0, 1), (0, 2)}), (1, 1))
 
         # 3 cells placed, 1 blocked = 12 empty
         assert board.empty_area == 12
