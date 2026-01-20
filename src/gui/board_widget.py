@@ -54,6 +54,20 @@ class BoardWidget(QWidget):
             None  # current_position from event
         )
 
+    def set_cell_size(self, cell_size: int) -> None:
+        """Update the cell size and recalculate widget size.
+
+        Args:
+            cell_size: New pixel size for each cell
+        """
+        self._cell_size = cell_size
+        self.setMinimumSize(
+            self._width * cell_size + 2,
+            self._height * cell_size + 2,
+        )
+        self.updateGeometry()
+        self.update()
+
     def handle_event(self, event: dict[str, Any]) -> None:
         """Update state based on solver event and trigger repaint.
 
@@ -66,7 +80,7 @@ class BoardWidget(QWidget):
         self._board = event.get("board_snapshot")
         self._current_piece = event.get("current_piece")
         self._current_position = event.get("current_position")
-        self.update()  # Trigger paintEvent
+        self.update()
 
     def paintEvent(self, event) -> None:
         """Override to render board using QPainter."""

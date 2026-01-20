@@ -705,9 +705,19 @@ class PieceTab(QWidget):
         return all_pieces
 
     def _refresh_piece_list(self) -> None:
-        """Refresh all list items with custom widgets showing counts."""
+        """Refresh all list items with custom widgets showing counts.
+
+        Pieces are automatically sorted by number of cells (ascending).
+        """
         self._piece_list.clear()
-        for piece, count in self._pieces.items():
+
+        # Sort pieces by number of cells (ascending order)
+        sorted_pieces = sorted(
+            self._pieces.items(),
+            key=lambda item: len(item[0].canonical_shape),
+        )
+
+        for piece, count in sorted_pieces:
             item = QListWidgetItem()
             item.setData(Qt.ItemDataRole.UserRole, piece)
 
