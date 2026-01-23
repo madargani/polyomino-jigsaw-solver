@@ -1,6 +1,10 @@
 # Polyomino Puzzle Solver
 
-A Python GUI application for solving polyomino puzzles using backtracking algorithm with real-time visualization.
+This Christmas I was gifted the [Aztec Labrinth puzzle](https://www.amazon.com/Bending-Wooden-Labyrinth-Difficult-Puzzles/dp/B08DDFNGV6) by Woodster.
+
+Inspired by day 12 of [Advent of Code 2025](https://adventofcode.com/2025) and my Analysis of Algorithms class, I decided to make a backtracking solver for this puzzle.
+
+![Solver Demo](assets/polyomino_solver.gif)
 
 ## Features
 
@@ -38,37 +42,68 @@ uv sync --all-groups
 uv run python -m src.main
 ```
 
+## Usage
+
+### Creating a Puzzle
+
+1. Launch the application
+2. Define pieces in the pieces tab
+3. Define board size and shape in the board tab
+
+### Solving a Puzzle
+
+1. Define a new puzzle or import an existing puzzle
+2. Click "Solve" to open the visualization window
+3. Click "Play" to start the solver
+4. Adjust speed using the slider or presets
+
+### Saving/Loading
+
+You can save defined puzzles to a JSON file and load them to the solver later.
+
 ## Project Structure
 
 ```
 polyomino-jigsaw-solver/
 ├── src/
+│   ├── main.py             # Application entry point
 │   ├── models/             # Data structures
-│   │   ├── piece.py       # PuzzlePiece class
-│   │   ├── board.py       # GameBoard class
-│   │   ├── puzzle_state.py # PuzzleState class
+│   │   ├── piece.py        # PuzzlePiece class
+│   │   ├── board.py        # GameBoard class
 │   │   └── puzzle_config.py # PuzzleConfiguration class
-│   ├── logic/             # Business logic
-│   │   ├── solver.py     # Backtracking algorithm
-│   │   ├── validator.py  # Validation logic
-│   │   └── rotation.py   # Rotation/flip operations
-│   ├── gui/              # User interface
-│   │   ├── editor_window.py  # Puzzle editor
-│   │   ├── board_view.py     # Grid editor
-│   │   ├── piece_widget.py   # Piece interaction
-│   │   └── viz_window.py     # Solver visualization
-│   └── utils/            # Utilities
-│       ├── file_io.py    # JSON I/O
-│       └── formatting.py  # Formatting helpers
-├── tests/               # Test suite
-│   ├── unit/            # Unit tests
-│   ├── integration/     # Integration tests
-│   └── fixtures/        # Test data
-├── specs/              # Feature specifications
+│   ├── logic/              # Business logic
+│   │   ├── solver.py       # Backtracking algorithm
+│   │   ├── validator.py    # Validation logic
+│   │   └── rotation.py     # Rotation/flip operations
+│   ├── gui/                # User interface
+│   │   ├── editor_window.py    # Main editor window
+│   │   ├── board_tab.py        # Board configuration tab
+│   │   ├── board_widget.py     # Board grid widget
+│   │   ├── piece_tab.py        # Piece editor tab
+│   │   ├── saved_puzzles_tab.py # Saved puzzles management
+│   │   └── visualization_window.py # Solver visualization
+│   └── utils/              # Utilities
+│       ├── file_io.py      # JSON I/O
+│       ├── formatting.py   # Formatting helpers
+│       └── color_generator.py # Color generation utilities
+├── tests/                  # Test suite
+│   ├── unit/               # Unit tests
+│   │   ├── test_board.py
+│   │   ├── test_piece.py
+│   │   ├── test_file_io.py
+│   │   ├── test_gui_handlers.py
+│   │   ├── test_rotation.py
+│   │   ├── test_solver.py
+│   │   └── test_validator.py
+│   └── integration/        # Integration tests
+│       ├── test_file_io_integration.py
+│       ├── test_puzzle_config.py
+│       └── test_puzzle_flow.py
+├── specs/                  # Feature specifications
 │   └── 001-polyomino-puzzle-solver/
-├── pyproject.toml       # Project configuration
-├── uv.lock             # Dependency lockfile
-└── README.md           # This file
+├── pyproject.toml          # Project configuration
+├── uv.lock                 # Dependency lockfile
+└── README.md               # This file
 ```
 
 ## Development
@@ -84,6 +119,12 @@ uv run pytest --cov=src --cov-report=html
 
 # Run specific test file
 uv run pytest tests/unit/test_piece.py -v
+
+# Run unit tests only
+uv run pytest tests/unit/
+
+# Run integration tests only
+uv run pytest tests/integration/
 ```
 
 ### Code Quality
@@ -104,31 +145,6 @@ uv run mypy src/ --strict
 # Run all quality checks
 uv run ruff check src/ && uv run mypy src/ --strict && uv run pytest tests/ -v
 ```
-
-## Usage
-
-### Creating a Puzzle
-
-1. Launch the application
-2. Set board dimensions using the width/height controls
-3. Click "Add Piece" to create a new piece
-4. Click on grid cells to define piece shape
-5. Repeat for all pieces
-
-### Solving a Puzzle
-
-1. Configure your puzzle with pieces and board
-2. Click "Solve" to open the visualization window
-3. Adjust speed using the slider or presets
-4. Watch the backtracking algorithm work
-5. Click "Stop" to interrupt if needed
-
-### Saving/Loading
-
-- **Save**: Save current puzzle to library
-- **Load**: Load a saved puzzle
-- **Export**: Export puzzle to JSON file
-- **Import**: Import puzzle from JSON file
 
 ## Dependencies
 
